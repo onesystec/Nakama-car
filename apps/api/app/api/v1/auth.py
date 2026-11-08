@@ -15,8 +15,8 @@ from app.models.identity import (
     UserStatus,
     UserTenant,
 )
-from app.schemas.auth import BootstrapRequest, LegalAcceptance, LoginRequest, LoginResponse
-from app.security.context import AuthContext, get_auth_context
+from app.schemas.auth import BootstrapRequest, LegalAcceptance, LoginRequest, LoginResponse, PasswordChange
+from app.security.context import AuthContext, get_auth_session
 from app.security.passwords import hash_password, verify_password
 from app.security.tokens import create_access_token
 from app.services import access
@@ -98,33 +98,55 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     access.record_access(db, request, tenant_id=membership.tenant_id, user_id=user.id, email=user.email, event="LOGIN_OK")
     db.commit()
 
-    permissions = effective_permissions(db, user.id, membership.tenant_id)
+    return login_response(db, user, membership.tenant_id)
+
+
+def login_response(db: Session, user: User, tenant_id) -> LoginResponse:
+    permissions = effective_permissions(db, user.id, tenant_id)
     token = create_access_token(
         user_id=user.id,
-        tenant_id=membership.tenant_id,
+        tenant_id=tenant_id,
         permissions=permissions,
         auth_version=user.auth_version,
     )
     return LoginResponse(
         access_token=token,
         user_id=user.id,
-        tenant_id=membership.tenant_id,
+        tenant_id=tenant_id,
         first_name=user.first_name,
         last_name=user.last_name,
         permissions=permissions,
         legal_required=access.legal_required(user),
-        **session_extras(db, user.id, membership.tenant_id),
+        must_change_password=user.must_change_password,
+        **session_extras(db, user.id, tenant_id),
     )
 
 
 @router.post("/auth/legal")
-def accept_legal(payload: LegalAcceptance, request: Request, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
+def accept_legal(payload: LegalAcceptance, request: Request, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_session)):
     """The worker ticked both boxes (terms, privacy notice) of the current version."""
     user = db.get(User, auth.user_id)
     access.accept_legal(user)
     access.record_access(db, request, tenant_id=auth.tenant_id, user_id=user.id, email=user.email, event="LEGAL_ACCEPTED")
     db.commit()
     return {"legal_version": user.legal_version, "terms_accepted_at": user.terms_accepted_at, "privacy_accepted_at": user.privacy_accepted_at}
+
+
+@router.post("/auth/password", response_model=LoginResponse)
+def change_password(payload: PasswordChange, request: Request, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_session)):
+    """The worker chooses their own password (required after a temporary one). Other sessions are closed."""
+    user = db.get(User, auth.user_id)
+    if not verify_password(user.password_hash, payload.current_password):
+        raise HTTPException(status_code=400, detail="La password attuale non è corretta.")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status_code=400, detail="La nuova password deve essere diversa.")
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.auth_version += 1
+    access.record_access(db, request, tenant_id=auth.tenant_id, user_id=user.id, email=user.email, event="PASSWORD_CHANGED")
+    db.commit()
+    db.refresh(user)
+    return login_response(db, user, auth.tenant_id)
 
 
 @router.post("/setup/bootstrap", response_model=LoginResponse)

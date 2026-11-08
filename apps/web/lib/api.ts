@@ -16,6 +16,11 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     headers,
   });
   if (response.status === 401 && token) handleExpiredSession();
+  // Still on a temporary password (e.g. the administrator shared a new one): choose it at the login.
+  else if (response.status === 403 && token) {
+    const detail = await response.clone().json().then((data) => data?.detail, () => undefined);
+    if (detail === "PASSWORD_CHANGE_REQUIRED") handleExpiredSession();
+  }
   return response;
 }
 

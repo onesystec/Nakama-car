@@ -57,6 +57,8 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(120), nullable=False)
     last_name: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), nullable=False, default=UserStatus.ACTIVE)
+    # True while the worker still has a temporary password from the administrator: the app asks for a new one first.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # Version of terms + privacy notice accepted (two separate boxes) and when; empty = must accept at next login.
     legal_version: Mapped[str | None] = mapped_column(String(20))
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

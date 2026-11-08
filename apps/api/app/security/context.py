@@ -20,7 +20,10 @@ class AuthContext:
     tenant_id: UUID
     permissions: frozenset[str]
 
-def get_auth_context(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme), db: Session = Depends(get_db)) -> AuthContext:
+PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
+
+
+def _session_user(credentials: HTTPAuthorizationCredentials | None, db: Session) -> tuple[User, AuthContext]:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     try:
@@ -34,13 +37,26 @@ def get_auth_context(credentials: HTTPAuthorizationCredentials | None = Depends(
         ))
         if user is None or user.status != UserStatus.ACTIVE or payload.get("auth_version", 0) != user.auth_version:
             raise ValueError("Session revoked")
-        return AuthContext(
-            user_id=UUID(payload["sub"]),
-            tenant_id=UUID(payload["tenant_id"]),
+        return user, AuthContext(
+            user_id=user_id,
+            tenant_id=tenant_id,
             permissions=frozenset(payload.get("permissions", [])),
         )
     except (TokenError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+def get_auth_session(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme), db: Session = Depends(get_db)) -> AuthContext:
+    """Any valid login, also one still on a temporary password: only for the routes that let the worker
+    get past the login (choose their password, accept the terms)."""
+    return _session_user(credentials, db)[1]
+
+
+def get_auth_context(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme), db: Session = Depends(get_db)) -> AuthContext:
+    user, context = _session_user(credentials, db)
+    if user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PASSWORD_CHANGE_REQUIRED)
+    return context
 
 def require_permission(permission: str):
     def dependency(context: AuthContext = Depends(get_auth_context)) -> AuthContext:

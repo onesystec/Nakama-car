@@ -1,7 +1,5 @@
 """Fleet customer portal: the workshop creates logins, the customer follows its vehicles."""
 import re
-import secrets
-import string
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
@@ -25,7 +23,7 @@ from app.models.garage import Customer, RepairCase, Vehicle
 from app.models.portal import PortalAccount
 from app.models.tracking import CaseMessage
 from app.security.context import AuthContext, require_permission
-from app.security.passwords import hash_password, verify_password
+from app.security.passwords import hash_password, temporary_password, verify_password
 from app.security.tokens import TokenError, decode_token, encode_token
 from app.schemas.auth import LegalAcceptance
 from app.services import access, estimate_links, fleet, tracking
@@ -108,14 +106,6 @@ CUSTOMER_INVOICES = (InvoiceStatus.ISSUED, InvoiceStatus.PAID)
 
 
 # ---------- helpers ----------
-
-def temporary_password() -> str:
-    alphabet = string.ascii_letters + string.digits
-    while True:
-        value = "".join(secrets.choice(alphabet) for _ in range(12))
-        if any(c.isdigit() for c in value) and any(c.isupper() for c in value) and any(c.islower() for c in value):
-            return value
-
 
 def account_dict(account: PortalAccount) -> dict:
     return {
