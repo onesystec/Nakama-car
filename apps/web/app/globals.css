@@ -2221,3 +2221,11 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .contract-documents-title { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #667085); width:100%; }
 .contract-document { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:2px 6px; }
 .contract-document small { color:var(--muted, #667085); }
+
+/* Staff access shared with the worker (Personale) */
+.staff-access-share { grid-column: 1 / -1; display: grid; gap: 8px; }
+.staff-access-text { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 13px; background: #fff; border: 1px solid #e3e7ec; border-radius: 8px; padding: 10px; color: #1d2733; }
+.staff-pending { background: #fff3df; color: #8a5300; }
+[data-theme="dark"] .staff-access-share { background: #1f2a1a; border-color: #5c4a22; }
+[data-theme="dark"] .staff-access-text { background: #0f1e2f; border-color: #26384d; color: #e7eef7; }
+[data-theme="dark"] .staff-pending { background: #3a2c12; color: #ffd58a; }

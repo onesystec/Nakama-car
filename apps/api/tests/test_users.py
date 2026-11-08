@@ -161,3 +161,81 @@ def test_worker_cannot_edit_any_account(client):
     worker = c.post("/api/v1/users", json=payload()).json()
     token = c.post("/api/v1/auth/login", json={"email":worker["email"],"password":payload()["password"]}).json()["access_token"]
     assert c.patch(f'/api/v1/users/{worker["id"]}', json=edit_payload(worker, role_code="ADMIN"), headers={"Authorization":"Bearer "+token}).status_code == 403
+
+
+def test_new_worker_without_password_gets_temporary_one_and_must_change_it(client):
+    c, engine, _ = client
+    body = payload()
+    body.pop("password")
+    created = c.post("/api/v1/users", json=body)
+    assert created.status_code == 201
+    temporary = created.json()["temporary_password"]
+    assert len(temporary) == 12 and created.json()["must_change_password"] is True
+    # Shown only once: the list never carries it.
+    listed = [u for u in c.get("/api/v1/users").json() if u["email"] == "worker@example.com"][0]
+    assert listed["temporary_password"] is None and listed["must_change_password"] is True
+
+    worker = TestClient(app)
+    login = worker.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": temporary})
+    assert login.status_code == 200 and login.json()["must_change_password"] is True
+    worker.headers["Authorization"] = "Bearer " + login.json()["access_token"]
+    # Nothing else until the worker chooses a password.
+    blocked = worker.get("/api/v1/me")
+    assert blocked.status_code == 403 and blocked.json()["detail"] == "PASSWORD_CHANGE_REQUIRED"
+    assert worker.post("/api/v1/auth/password", json={"current_password": "wrong", "new_password": "MyOwnPassword2026"}).status_code == 400
+    assert worker.post("/api/v1/auth/password", json={"current_password": temporary, "new_password": temporary}).status_code == 400
+    assert worker.post("/api/v1/auth/password", json={"current_password": temporary, "new_password": "short"}).status_code == 422
+    changed = worker.post("/api/v1/auth/password", json={"current_password": temporary, "new_password": "MyOwnPassword2026"})
+    assert changed.status_code == 200 and changed.json()["must_change_password"] is False
+    # The token used to change it is closed; the new one works.
+    assert worker.get("/api/v1/me").status_code == 401
+    worker.headers["Authorization"] = "Bearer " + changed.json()["access_token"]
+    assert worker.get("/api/v1/me").status_code == 200
+    assert c.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": temporary}).status_code == 401
+    assert c.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": "MyOwnPassword2026"}).json()["must_change_password"] is False
+
+
+def test_typed_password_is_not_temporary(client):
+    c, _, _ = client
+    created = c.post("/api/v1/users", json=payload())
+    assert created.json()["temporary_password"] is None and created.json()["must_change_password"] is False
+    login = c.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": payload()["password"]})
+    assert login.json()["must_change_password"] is False
+
+
+def test_share_access_again_issues_new_temporary_password(client):
+    c, engine, _ = client
+    worker_id = c.post("/api/v1/users", json=payload()).json()["id"]
+    worker = TestClient(app)
+    old = worker.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": payload()["password"]}).json()
+    worker.headers["Authorization"] = "Bearer " + old["access_token"]
+    assert worker.get("/api/v1/me").status_code == 200
+
+    shared = c.post(f"/api/v1/users/{worker_id}/share-access")
+    assert shared.status_code == 200
+    temporary = shared.json()["temporary_password"]
+    assert temporary and shared.json()["must_change_password"] is True
+    # The old password and the open session stop working.
+    assert worker.get("/api/v1/me").status_code == 401
+    assert c.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": payload()["password"]}).status_code == 401
+    assert c.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": temporary}).json()["must_change_password"] is True
+    with Session(engine) as db:
+        audit = db.scalar(select(AuditLog).where(AuditLog.entity_id == worker_id_uuid(worker_id), AuditLog.action == "ACCESS_SHARED"))
+        assert audit is not None and audit.new_value == {"changed_fields": ["password"]}
+
+
+def worker_id_uuid(value):
+    import uuid
+    return uuid.UUID(value)
+
+
+def test_share_access_rules(client):
+    c, _, _ = client
+    me = c.get("/api/v1/users").json()[0]["id"]
+    assert c.post(f"/api/v1/users/{me}/share-access").status_code == 409
+    assert c.post("/api/v1/users/00000000-0000-0000-0000-000000000000/share-access").status_code == 404
+    worker_id = c.post("/api/v1/users", json=payload()).json()["id"]
+    worker = TestClient(app)
+    token = worker.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": payload()["password"]}).json()["access_token"]
+    worker.headers["Authorization"] = "Bearer " + token
+    assert worker.post(f"/api/v1/users/{worker_id}/share-access").status_code == 403

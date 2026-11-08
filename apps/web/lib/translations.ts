@@ -1802,6 +1802,38 @@ Object.assign(spanish, {
   "App Mac": "App Mac"
 });
 
+// Sharing a worker's access (Personale) and choosing the password at the first login.
+Object.assign(spanish, {
+  "Condividi": "Compartir",
+  "Copia messaggio": "Copiar mensaje",
+  "Invia accesso": "Enviar acceso",
+  "Preparazione…": "Preparando…",
+  "Primo accesso in attesa": "Primer acceso pendiente",
+  "Accesso per": "Acceso para",
+  "Accesso condiviso.": "Acceso compartido.",
+  "Messaggio copiato: incollalo dove vuoi.": "Mensaje copiado: pégalo donde quieras.",
+  "Impossibile copiare: seleziona il testo e copialo a mano.": "No se pudo copiar: selecciona el texto y cópialo a mano.",
+  "Il tuo accesso a Nakama Car": "Tu acceso a Nakama Car",
+  "ecco il tuo accesso a Nakama Car.": "aquí tienes tu acceso a Nakama Car.",
+  "Entra da": "Entra desde",
+  "Al primo accesso ti chiederà di scegliere la tua password.": "En el primer acceso te pedirá que elijas tu contraseña.",
+  "La password temporanea si vede solo ora. Inviala al lavoratore: al primo accesso sceglierà la sua password.": "La contraseña temporal solo se ve ahora. Envíasela al trabajador: en el primer acceso elegirá la suya.",
+  "La password non serve: l’app ne crea una temporanea da inviare al lavoratore, che al primo accesso sceglierà la sua.": "No hace falta contraseña: la app crea una temporal para enviar al trabajador, que en el primer acceso elegirá la suya.",
+  "Inviare l’accesso a": "¿Enviar el acceso a",
+  "Verrà creata una nuova password temporanea: quella attuale smetterà di funzionare e al primo accesso sceglierà la sua.": "Se creará una nueva contraseña temporal: la actual dejará de funcionar y en el primer acceso elegirá la suya.",
+  "Impossibile preparare l’accesso.": "No se pudo preparar el acceso.",
+  "Controlla i dati: nome, cognome ed email valida.": "Revisa los datos: nombre, apellido y un correo válido.",
+  "Stai usando la password temporanea ricevuta dall’amministratore. Scegli la tua password per entrare: almeno 10 caratteri.": "Estás usando la contraseña temporal que te dio el administrador. Elige tu contraseña para entrar: al menos 10 caracteres.",
+  "Ripeti la nuova password": "Repite la nueva contraseña",
+  "Le due password non coincidono.": "Las dos contraseñas no coinciden.",
+  "Salva password ed entra": "Guardar contraseña y entrar",
+  "La nuova password deve avere almeno 10 caratteri.": "La nueva contraseña debe tener al menos 10 caracteres.",
+  "Impossibile cambiare la password.": "No se pudo cambiar la contraseña.",
+  "Non puoi inviare l’accesso al tuo stesso account": "No puedes enviarte el acceso a tu propia cuenta",
+  "Account disabilitato: riattivalo prima di inviare l’accesso": "Cuenta desactivada: reactívala antes de enviar el acceso",
+});
+
+
 export function translate(text: string, language: Language): string {
   if (Object.prototype.hasOwnProperty.call(codes, text)) return codes[text][language === "es" ? 1 : 0];
   return language === "es" && Object.prototype.hasOwnProperty.call(spanish, text) ? spanish[text] : text;

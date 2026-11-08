@@ -15,6 +15,8 @@ export type StaffSession = {
   work_area?: "BODY" | "MECHANICAL" | null;
   /** True until the user ticks the two boxes (terms, privacy notice) of the current version. */
   legal_required?: boolean;
+  /** True while the worker is on the temporary password the administrator shared: a new one is chosen first. */
+  must_change_password?: boolean;
 };
 
 export type SignInResult =
@@ -98,4 +100,30 @@ export async function acceptLegal(apiUrl: string, result: SignInResult, fetcher:
   } catch {
     return false;
   }
+}
+
+/** True when a worker signed in with the temporary password received from the administrator. */
+export function needsPasswordChange(result: SignInResult): boolean {
+  return result.kind === "staff" && result.session.must_change_password === true;
+}
+
+export type PasswordChangeResult = { ok: true; session: StaffSession } | { ok: false; message: string };
+
+/** The worker replaces the temporary password; the answer is a fresh session (the old token stops working). */
+export async function changeStaffPassword(apiUrl: string, session: StaffSession, currentPassword: string, newPassword: string, fetcher: Fetch = fetch): Promise<PasswordChangeResult> {
+  let response: Response;
+  try {
+    response = await fetcher(`${apiUrl}/auth/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  } catch {
+    return { ok: false, message: SERVER_UNREACHABLE };
+  }
+  const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (response.ok && typeof data.access_token === "string") return { ok: true, session: data as unknown as StaffSession };
+  if (response.status === 422) return { ok: false, message: "La nuova password deve avere almeno 10 caratteri." };
+  if (response.status >= 500) return { ok: false, message: SERVER_ERROR };
+  return { ok: false, message: typeof data.detail === "string" ? data.detail : "Impossibile cambiare la password." };
 }

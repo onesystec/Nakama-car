@@ -10,7 +10,7 @@ from app.models.staff import UserProfile
 from app.schemas.users import UserCreate, UserRead, UserUpdate
 from app.security.context import AuthContext, require_permission
 from app.services.staff import user_area
-from app.security.passwords import hash_password
+from app.security.passwords import hash_password, temporary_password
 from app.services.audit import record_audit
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -34,6 +34,7 @@ def user_to_read(db: Session, user: User, tenant_id) -> UserRead:
         status=user.status,
         role_codes=sorted(roles),
         work_area=user_area(db, user.id, tenant_id),
+        must_change_password=user.must_change_password,
     )
 
 
@@ -69,12 +70,15 @@ def create_user(
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
 
+    # No password typed: a temporary one, shown only in this answer, that the worker replaces at the first login.
+    temporary = temporary_password() if payload.password is None else None
     user = User(
         email=payload.email.lower(),
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password or temporary),
         first_name=payload.first_name,
         last_name=payload.last_name,
         status=UserStatus.ACTIVE,
+        must_change_password=temporary is not None,
     )
     try:
         db.add(user)
@@ -89,7 +93,7 @@ def create_user(
         db.rollback()
         raise HTTPException(status_code=409, detail="Account already exists or could not be assigned")
     db.refresh(user)
-    return user_to_read(db, user, auth.tenant_id)
+    return user_to_read(db, user, auth.tenant_id).model_copy(update={"temporary_password": temporary})
 
 
 @router.patch("/{user_id}", response_model=UserRead)
@@ -152,6 +156,36 @@ def update_user(
         raise HTTPException(status_code=409, detail="Impossibile salvare: account già esistente o assegnazione non valida")
     db.refresh(user)
     return user_to_read(db, user, auth.tenant_id)
+
+
+@router.post("/{user_id}/share-access", response_model=UserRead)
+def share_access(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_permission("users.manage")),
+):
+    """Send the access to a worker again: a new temporary password (the old one and open sessions stop working),
+    returned once so the administrator can share it; the worker chooses their own at the first login."""
+    user = db.scalar(select(User).join(UserTenant, UserTenant.user_id == User.id).where(
+        User.id == user_id, UserTenant.tenant_id == auth.tenant_id,
+    ).with_for_update())
+    if user is None:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    if user_id == auth.user_id:
+        raise HTTPException(status_code=409, detail="Non puoi inviare l’accesso al tuo stesso account")
+    if db.scalar(select(func.count(UserTenant.id)).where(UserTenant.user_id == user_id)) != 1:
+        raise HTTPException(status_code=409, detail="Account condiviso tra aziende: contatta l’amministratore della piattaforma")
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(status_code=409, detail="Account disabilitato: riattivalo prima di inviare l’accesso")
+    temporary = temporary_password()
+    user.password_hash = hash_password(temporary)
+    user.must_change_password = True
+    user.auth_version += 1
+    record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="user", entity_id=user_id,
+                 action="ACCESS_SHARED", new_value={"changed_fields": ["password"]})
+    db.commit()
+    db.refresh(user)
+    return user_to_read(db, user, auth.tenant_id).model_copy(update={"temporary_password": temporary})
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

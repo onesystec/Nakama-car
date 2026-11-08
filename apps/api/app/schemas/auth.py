@@ -22,6 +22,8 @@ class LoginResponse(BaseModel):
     work_area: str | None = None
     # True until the user ticks the two boxes (terms, privacy notice) of the current version.
     legal_required: bool = False
+    # True while the worker is on a temporary password: POST /auth/password before anything else.
+    must_change_password: bool = False
 
 
 class LegalAcceptance(BaseModel):
@@ -41,3 +43,8 @@ class BootstrapRequest(BaseModel):
     vat_number: str | None = None
     accept_terms: bool = False
     accept_privacy: bool = False
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=10, max_length=200)
