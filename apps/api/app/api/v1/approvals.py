@@ -16,8 +16,9 @@ from app.schemas.approval import (
     PublicEstimateLine,
     PublicEstimateRead,
 )
-from app.security.context import AuthContext, require_permission
+from app.security.context import AuthContext, require_any_permission
 from app.services.access import LEGAL_VERSION, client_ip
+from app.services.estimate_links import link_expired, new_expiry, renew_if_expired
 from app.services.contracts import customer_display_name
 from app.services.workshop import open_work_order
 
@@ -28,7 +29,8 @@ router = APIRouter(tags=["estimate-approval"])
 def create_estimate_share(
     estimate_id: UUID,
     db: Session = Depends(get_db),
-    auth: AuthContext = Depends(require_permission("estimate.read")),
+    # Sending an estimate to the customer is office work: reading estimates is not enough.
+    auth: AuthContext = Depends(require_any_permission("estimate.create", "estimate.approve")),
 ):
     estimate = db.scalar(
         select(Estimate).where(Estimate.id == estimate_id, Estimate.tenant_id == auth.tenant_id)
@@ -42,11 +44,15 @@ def create_estimate_share(
             EstimateApproval.tenant_id == auth.tenant_id,
         )
     )
+    if approval is not None and renew_if_expired(approval):
+        db.commit()
+        db.refresh(approval)
     if approval is None:
         approval = EstimateApproval(
             tenant_id=auth.tenant_id,
             estimate_id=estimate.id,
             public_token=secrets.token_urlsafe(32),
+            expires_at=new_expiry(),
         )
         db.add(approval)
         if estimate.status == EstimateStatus.DRAFT:
@@ -84,6 +90,8 @@ def get_public_context(db: Session, token: str):
     )
     if approval is None:
         raise HTTPException(status_code=404, detail="Estimate link not found")
+    if link_expired(approval):
+        raise HTTPException(status_code=410, detail="Il link è scaduto: chiedi all'officina di inviarlo di nuovo.")
 
     estimate = db.scalar(
         select(Estimate).where(

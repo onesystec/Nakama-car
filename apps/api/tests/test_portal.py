@@ -41,6 +41,19 @@ def test_fleet_portal_login_vehicles_maintenance_and_chat(client):
 
     me = portal.get("/api/v1/portal/me").json()
     assert me["customer_name"] == "Univex Group" and me["contract"]["name"] == "Manutenzione flotta Univex"
+
+    # No data before the current terms are accepted and the temporary password replaced (the API says so,
+    # not only the web page).
+    assert portal.get("/api/v1/portal/vehicles").status_code == 401
+    assert portal.post("/api/v1/portal/legal", json={"accept_terms": True, "accept_privacy": True}).status_code == 200
+    blocked = portal.get("/api/v1/portal/vehicles")
+    assert blocked.status_code == 403 and blocked.json()["detail"] == "PASSWORD_CHANGE_REQUIRED"
+    changed = portal.post("/api/v1/portal/password", json={"current_password": temporary, "new_password": "NuovaPassword2026"})
+    assert changed.status_code == 200
+    assert portal.get("/api/v1/portal/me").status_code == 401  # old session revoked
+    portal.headers["Authorization"] = "Bearer " + changed.json()["access_token"]
+    assert portal.get("/api/v1/portal/me").json()["must_change_password"] is False
+
     vehicles = portal.get("/api/v1/portal/vehicles").json()
     assert len(vehicles) == 1
     assert vehicles[0]["current_case"]["case_number"] == case["case_number"]
@@ -63,24 +76,26 @@ def test_fleet_portal_login_vehicles_maintenance_and_chat(client):
     assert portal.get(f"/api/v1/portal/vehicles/{other_vehicle['id']}").status_code == 404
     assert portal.get(f"/api/v1/portal/cases/{other_case['id']}/messages").status_code == 404
 
-    changed = portal.post("/api/v1/portal/password", json={"current_password": temporary, "new_password": "NuovaPassword2026"})
-    assert changed.status_code == 200
-    assert portal.get("/api/v1/portal/me").status_code == 401  # old session revoked
-    portal.headers["Authorization"] = "Bearer " + changed.json()["access_token"]
-    assert portal.get("/api/v1/portal/me").json()["must_change_password"] is False
-
     assert c.patch(f"/api/v1/portal-accounts/{account['id']}", json={"active": False}).json()["active"] is False
     assert portal.get("/api/v1/portal/me").status_code == 401
     assert portal.post("/api/v1/portal/auth/login", json={"email": "flotta@univex.example.com", "password": "NuovaPassword2026"}).status_code == 401
 
 
+def ready_portal(c, account):
+    """A customer's first entry, as the app does it: login, both boxes, own password instead of the temporary one."""
+    portal = c.__class__(c.app)
+    login = portal.post("/api/v1/portal/auth/login", json={"email": account["email"], "password": account["temporary_password"]})
+    portal.headers["Authorization"] = "Bearer " + login.json()["access_token"]
+    assert portal.post("/api/v1/portal/legal", json={"accept_terms": True, "accept_privacy": True}).status_code == 200
+    changed = portal.post("/api/v1/portal/password", json={"current_password": account["temporary_password"], "new_password": "PasswordCliente2026"})
+    portal.headers["Authorization"] = "Bearer " + changed.json()["access_token"]
+    return portal
+
+
 def portal_client(c, customer):
     email = f"menu-{customer['id'][:8]}@example.com"
     account = c.post(f"/api/v1/customers/{customer['id']}/portal-accounts", json={"email": email, "full_name": "Ufficio flotta"}).json()
-    portal = c.__class__(c.app)
-    login = portal.post("/api/v1/portal/auth/login", json={"email": email, "password": account["temporary_password"]})
-    portal.headers["Authorization"] = "Bearer " + login.json()["access_token"]
-    return portal
+    return ready_portal(c, account)
 
 
 def test_portal_menu_sections_and_customer_adds_vehicles(client):

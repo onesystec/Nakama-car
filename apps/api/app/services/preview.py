@@ -4,12 +4,11 @@ A test copy must never touch the real database: before migrating, it checks that
 empty or already marked as a test database, and refuses to start otherwise. A fresh test database gets
 the demo workshop below so there is something to click on.
 """
-import os
 
 from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.core.config import get_settings, is_test_copy
 
 MARKER_TABLE = "nakama_test_database"
 DEMO_EMAIL = "prova@example.com"
@@ -22,10 +21,7 @@ class RealDatabaseError(RuntimeError):
 
 def is_test_environment() -> bool:
     """APP_ENV=preview, or any Railway environment other than production (PR environments)."""
-    if get_settings().app_env == "preview":
-        return True
-    railway_environment = os.environ.get("RAILWAY_ENVIRONMENT_NAME")
-    return bool(railway_environment) and railway_environment != "production"
+    return is_test_copy(get_settings())
 
 
 def claim_test_database(engine: Engine) -> None:

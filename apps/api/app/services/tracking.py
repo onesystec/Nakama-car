@@ -11,6 +11,7 @@ from app.models.garage import Customer, RepairCase, RepairCaseStatus, Vehicle
 from app.models.identity import Tenant, TenantSettings
 from app.models.tracking import CaseMessage
 from app.models.workshop import WorkOrder, WorkOrderTask, WorkTaskStatus
+from app.services import estimate_links
 
 # Customer-friendly steps; each groups one or more internal statuses.
 STEPS: list[tuple[str, str, tuple[RepairCaseStatus, ...]]] = [
@@ -151,6 +152,8 @@ def case_progress(db: Session, case: RepairCase) -> dict:
     estimate_info = None
     if estimate is not None:
         approval = db.scalar(select(EstimateApproval).where(EstimateApproval.estimate_id == estimate.id, EstimateApproval.tenant_id == tenant_id))
+        if approval is not None and estimate_links.renew_if_expired(approval):
+            db.commit()  # the customer follows the repair here: an expired estimate link is replaced
         estimate_info = {
             "estimate_number": estimate.estimate_number,
             "status": estimate.status.value,

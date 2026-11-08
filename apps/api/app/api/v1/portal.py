@@ -10,7 +10,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from fastapi.responses import Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -27,8 +26,9 @@ from app.models.portal import PortalAccount
 from app.models.tracking import CaseMessage
 from app.security.context import AuthContext, require_permission
 from app.security.passwords import hash_password, verify_password
+from app.security.tokens import TokenError, decode_token, encode_token
 from app.schemas.auth import LegalAcceptance
-from app.services import access, fleet, tracking
+from app.services import access, estimate_links, fleet, tracking
 from app.services.audit import record_audit
 from app.services.pdf import build_invoice_pdf
 from app.services.integrations import latest_reading
@@ -279,7 +279,7 @@ class PortalContext:
 
 def portal_token(account: PortalAccount) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode({
+    return encode_token({
         "sub": str(account.id),
         "tenant_id": str(account.tenant_id),
         "customer_id": str(account.customer_id),
@@ -287,22 +287,43 @@ def portal_token(account: PortalAccount) -> str:
         "auth_version": account.auth_version,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=PORTAL_TOKEN_HOURS)).timestamp()),
-    }, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    })
 
 
-def get_portal_context(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)) -> PortalContext:
+PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
+
+
+def portal_account_from_token(credentials: HTTPAuthorizationCredentials | None, db: Session) -> PortalAccount:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
-        payload = jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = decode_token(credentials.credentials)
         if payload.get("type") != "portal":
             raise ValueError("wrong token")
         account = db.get(PortalAccount, UUID(payload["sub"]))
         if account is None or not account.active or account.auth_version != payload.get("auth_version"):
             raise ValueError("revoked")
-        return PortalContext(account_id=account.id, tenant_id=account.tenant_id, customer_id=account.customer_id)
-    except (JWTError, KeyError, ValueError):
+        return account
+    except (TokenError, KeyError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def get_portal_session(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)) -> PortalContext:
+    """Any valid portal login, also one still on the temporary password or without the current terms:
+    only for the routes that let the customer fix that (who am I, change password, accept the terms)."""
+    account = portal_account_from_token(credentials, db)
+    return PortalContext(account_id=account.id, tenant_id=account.tenant_id, customer_id=account.customer_id)
+
+
+def get_portal_context(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)) -> PortalContext:
+    """The customer's data: only after the temporary password is replaced and the current terms accepted."""
+    account = portal_account_from_token(credentials, db)
+    if access.legal_required(account):
+        # 401 sends the app back to the login, which asks for the two boxes before going on.
+        raise HTTPException(status_code=401, detail="Accetta i termini e l'informativa privacy aggiornati.")
+    if account.must_change_password:
+        raise HTTPException(status_code=403, detail=PASSWORD_CHANGE_REQUIRED)
+    return PortalContext(account_id=account.id, tenant_id=account.tenant_id, customer_id=account.customer_id)
 
 
 def portal_vehicle(db: Session, context: PortalContext, vehicle_id: UUID) -> Vehicle:
@@ -325,6 +346,7 @@ def portal_case(db: Session, context: PortalContext, case_id: UUID) -> RepairCas
 
 @router.post("/portal/auth/login")
 def portal_login(payload: PortalLogin, request: Request, db: Session = Depends(get_db)):
+    access.check_login_allowed(db, request, payload.email)
     account = db.scalar(select(PortalAccount).where(func.lower(PortalAccount.email) == payload.email.lower()))
     if account is None or not account.active or not verify_password(account.password_hash, payload.password):
         if account is not None:
@@ -341,7 +363,7 @@ def portal_login(payload: PortalLogin, request: Request, db: Session = Depends(g
 
 
 @router.post("/portal/legal")
-def portal_accept_legal(payload: LegalAcceptance, request: Request, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+def portal_accept_legal(payload: LegalAcceptance, request: Request, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_session)):
     """The customer ticked both boxes (terms, privacy notice) of the current version."""
     account = db.get(PortalAccount, context.account_id)
     access.accept_legal(account)
@@ -351,7 +373,7 @@ def portal_accept_legal(payload: LegalAcceptance, request: Request, db: Session 
 
 
 @router.post("/portal/password")
-def portal_change_password(payload: PasswordChange, request: Request, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+def portal_change_password(payload: PasswordChange, request: Request, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_session)):
     account = db.get(PortalAccount, context.account_id)
     if not verify_password(account.password_hash, payload.current_password):
         raise HTTPException(status_code=400, detail="La password attuale non è corretta.")
@@ -367,7 +389,7 @@ def portal_change_password(payload: PasswordChange, request: Request, db: Sessio
 
 
 @router.get("/portal/me")
-def portal_me(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+def portal_me(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_session)):
     account = db.get(PortalAccount, context.account_id)
     customer = db.scalar(select(Customer).where(Customer.id == context.customer_id, Customer.tenant_id == context.tenant_id))
     contract = db.scalar(
@@ -556,6 +578,8 @@ def portal_estimates(db: Session = Depends(get_db), context: PortalContext = Dep
             .limit(1)
         )
         pending = estimate.status in (EstimateStatus.SENT, EstimateStatus.VIEWED)
+        if approval is not None and pending and estimate_links.renew_if_expired(approval):
+            db.commit()
         result.append({
             "id": str(estimate.id),
             "estimate_number": estimate.estimate_number,
@@ -685,7 +709,7 @@ def portal_profile(db: Session = Depends(get_db), context: PortalContext = Depen
 
 
 @router.get("/portal/logo")
-def portal_logo(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+def portal_logo(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_session)):
     """The customer's own company logo, set by the workshop."""
     customer = portal_customer(db, context)
     if not customer.logo:

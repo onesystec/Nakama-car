@@ -241,7 +241,8 @@ def public_send_message(token: str, payload: MessageCreate, db: Session = Depend
     if tracking.customer_messages_last_hour(db, case) >= tracking.CUSTOMER_MESSAGES_PER_HOUR:
         raise HTTPException(status_code=429, detail="Troppi messaggi: riprova tra poco.")
     customer = db.scalar(select(Customer).where(Customer.id == case.customer_id, Customer.tenant_id == case.tenant_id))
-    name = (payload.author_name or "").strip() or tracking.customer_display_name(customer) or "Cliente"
+    # Whoever holds the link writes as the customer of the repair: a typed name could pose as someone else.
+    name = tracking.customer_display_name(customer) or "Cliente"
     message = tracking.new_message(db, case, sender="CUSTOMER", author_name=name, body=body)
     return tracking.message_dict(message)
 

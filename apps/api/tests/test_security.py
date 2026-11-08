@@ -2,7 +2,7 @@ import uuid
 
 from app.security.passwords import hash_password, verify_password
 from app.security.tokens import create_access_token
-from jose import jwt
+import jwt
 
 from app.core.config import get_settings
 

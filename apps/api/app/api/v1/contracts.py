@@ -14,6 +14,7 @@ from app.schemas.contracts import ServiceContractCreate, ServiceContractRead, Se
 from app.security.context import AuthContext, require_permission
 from app.services.audit import record_audit
 from app.services.contracts import customer_display_name, find_active_contract
+from app.services.uploads import read_body
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
@@ -201,7 +202,7 @@ async def upload_contract_document(
     contract = get_tenant_contract(db, auth.tenant_id, contract_id)
     if int(request.headers.get("content-length") or 0) > MAX_DOCUMENT_BYTES:
         raise HTTPException(status_code=413, detail="File troppo grande (max 15 MB).")
-    content = await request.body()
+    content = await read_body(request, MAX_DOCUMENT_BYTES)
     if not content:
         raise HTTPException(status_code=422, detail="Il file è vuoto.")
     if len(content) > MAX_DOCUMENT_BYTES:

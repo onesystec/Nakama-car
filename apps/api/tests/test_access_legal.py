@@ -11,7 +11,7 @@ def test_staff_login_is_logged_and_legal_acceptance_is_stored(client):
     c, engine, _ = client
     assert c.post("/api/v1/users", json=payload()).status_code == 201
     worker = c.__class__(c.app)
-    android = {"User-Agent": "Mozilla/5.0 (Linux; Android 14; wv) NakamaAndroid/1.1.1", "X-Forwarded-For": "93.40.1.2, 10.0.0.1"}
+    android = {"User-Agent": "Mozilla/5.0 (Linux; Android 14; wv) NakamaAndroid/1.1.1", "X-Forwarded-For": "6.6.6.6, 93.40.1.2"}
 
     assert worker.post("/api/v1/auth/login", json={"email": "worker@example.com", "password": "wrong"}, headers=android).status_code == 401
     assert worker.post("/api/v1/auth/login", json={"email": "nobody@example.com", "password": "wrong"}).status_code == 401

@@ -6,6 +6,7 @@ from openpyxl import Workbook, load_workbook
 import test_fleet_billing as fleet
 import test_tracking as tracking_tests
 from test_users import client  # noqa: F401  (pytest fixture)
+from test_portal import ready_portal
 
 
 def excel(rows):
@@ -48,9 +49,7 @@ def test_fleet_profile_lists_jobs_to_do_and_done_by_plate(client):
 
     # The customer sees the same profile from the portal.
     account = c.post(f"/api/v1/customers/{customer['id']}/portal-accounts", json={"email": "flotta@univex.example.com", "full_name": "Ufficio flotta"}).json()
-    portal = c.__class__(c.app)
-    token = portal.post("/api/v1/portal/auth/login", json={"email": account["email"], "password": account["temporary_password"]}).json()["access_token"]
-    portal.headers["Authorization"] = "Bearer " + token
+    portal = ready_portal(c, account)
     assert portal.get("/api/v1/portal/fleet").json()["totals"] == data["totals"]
 
 

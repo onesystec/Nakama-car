@@ -98,8 +98,13 @@ export default function PortalPage() {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   const loadAll = useCallback(async () => {
-    const [meResponse, vehiclesResponse] = await Promise.all([portalFetch("/portal/me"), portalFetch("/portal/vehicles")]);
-    if (meResponse.ok) setMe(await meResponse.json());
+    const meResponse = await portalFetch("/portal/me");
+    if (!meResponse.ok) return;
+    const profile: Me = await meResponse.json();
+    setMe(profile);
+    // On the temporary password the API gives no data yet: only the form to choose a password.
+    if (profile.must_change_password) return;
+    const vehiclesResponse = await portalFetch("/portal/vehicles");
     if (vehiclesResponse.ok) setVehicles(await vehiclesResponse.json());
     else if (vehiclesResponse.status !== 401) setError(await portalError(vehiclesResponse, "Impossibile caricare i veicoli."));
   }, []);
@@ -268,7 +273,7 @@ export default function PortalPage() {
           </section>
         )}
 
-        {selected ? (
+        {!me || me.must_change_password ? null : selected ? (
           <section className="panel portal-vehicle">
             <button type="button" className="ghost" onClick={() => setSelected(null)}>← {t("Tutti i veicoli")}</button>
             <div className="portal-vehicle-head">

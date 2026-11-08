@@ -49,8 +49,10 @@ Al hacer el merge o cerrar el PR, Railway la borra sola.
 > Si el enlace no aparece: en Railway, arriba a la izquierda, despliega el selector de entorno
 > (pone «production») y elige el que termina en `pr-<número>`. Ahí ves las copias y sus enlaces.
 
-**Ojo con los servicios de pago:** la copia de prueba usa las mismas claves que la app real para buscar matrículas
-(targa.co.it) y para las fotos de los coches (carimage.dev). Cada matrícula o foto nueva que pruebes gasta un crédito.
+**Servicios externos apagados:** la copia de prueba es pública y su usuario está en esta página, así que arranca
+sin las claves de matrículas (targa.co.it), fotos de coches (carimage.dev), almacenamiento S3 ni DATEV, aunque
+Railway las copie de producción. Si un PR necesita probarlas, pon `PREVIEW_EXTERNAL_SERVICES=true` en ese entorno
+(cada matrícula o foto nueva gastará un crédito) y quítalo al terminar.
 
 ---
 
