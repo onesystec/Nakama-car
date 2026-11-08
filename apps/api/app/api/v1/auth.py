@@ -79,6 +79,7 @@ def effective_permissions(db: Session, user_id, tenant_id) -> list[str]:
 
 @router.post("/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    access.check_login_allowed(db, request, payload.email)
     user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     membership = None if user is None else db.scalar(
         select(UserTenant)

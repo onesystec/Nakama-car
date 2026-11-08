@@ -28,6 +28,7 @@ from app.services.contracts import customer_display_name, find_active_contract
 from app.services.photos import MAX_UPLOAD_BYTES, PhotoError, prepare_photo
 from app.services.tracking import case_render
 from app.services.workshop import ensure_item_tasks
+from app.services.uploads import read_body
 
 router = APIRouter(tags=["staff"])
 
@@ -581,7 +582,7 @@ async def add_diagnosis_photo(
     if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Foto troppo grande (max 15 MB).")
     try:
-        content, width, height = prepare_photo(await request.body())
+        content, width, height = prepare_photo(await read_body(request, MAX_UPLOAD_BYTES, "Foto troppo grande (max 15 MB)."))
     except PhotoError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     photo = Media(

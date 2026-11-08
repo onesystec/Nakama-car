@@ -1,9 +1,24 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from jose import jwt
+
+import jwt
+
 from app.core.config import get_settings
 
 settings = get_settings()
+
+# Any invalid, expired or tampered token.
+TokenError = jwt.PyJWTError
+
+
+def encode_token(payload: dict) -> str:
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_token(token: str) -> dict:
+    """Signature and expiry checked; only the configured algorithm is accepted."""
+    return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm], options={"require": ["exp", "sub"]})
+
 
 def create_access_token(*, user_id: UUID, tenant_id: UUID, permissions: list[str], auth_version: int = 0) -> str:
     now = datetime.now(timezone.utc)
@@ -16,4 +31,4 @@ def create_access_token(*, user_id: UUID, tenant_id: UUID, permissions: list[str
         "type": "access",
         "auth_version": auth_version,
     }
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return encode_token(payload)

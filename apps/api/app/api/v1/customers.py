@@ -16,6 +16,7 @@ from app.security.context import AuthContext, is_admin, require_permission
 from app.services.audit import record_audit
 from app.services.photos import MAX_UPLOAD_BYTES, PhotoError, prepare_photo
 from app.services.tracking import customer_display_name
+from app.services.uploads import read_body
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -196,7 +197,7 @@ async def upload_customer_logo(
     if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Immagine troppo grande (max 15 MB).")
     try:
-        content, _, _ = prepare_photo(await request.body(), max_side=LOGO_SIDE)
+        content, _, _ = prepare_photo(await read_body(request, MAX_UPLOAD_BYTES, "Immagine troppo grande (max 15 MB)."), max_side=LOGO_SIDE)
     except PhotoError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     customer.logo = content

@@ -10,8 +10,9 @@ on:
   pull_request:
     paths: ["desktop/**", ".github/workflows/desktop.yml"]
 
+# Read-only by default; only the release job (main) may write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   mac:
@@ -40,11 +41,25 @@ jobs:
         with:
           name: NAKAMA-CAR-mac
           path: desktop/dist/NAKAMA-CAR-mac.dmg
+
+  release:
+    needs: mac
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/package.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: NAKAMA-CAR-mac
+          path: dist
       - name: Publicar en Releases
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="mac-v$(node -p "require('./package.json').version")"
+          TAG="mac-v$(node -p "require('./desktop/package.json').version")"
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "NAKAMA CAR para Mac $TAG" --notes "App nativa para Mac (Intel y Apple Silicon). Se actualiza sola con cada versión de NAKAMA CAR."
           gh release upload "$TAG" dist/NAKAMA-CAR-mac.dmg --clobber

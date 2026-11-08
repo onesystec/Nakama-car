@@ -91,6 +91,8 @@ JWT_SECRET=<long-random-secret>
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 BOOTSTRAP_TOKEN=<one-time-random-bootstrap-secret>
+# Encrypts the third-party keys saved in Configurazione → Integrazioni (long random value, keep it forever).
+INTEGRATIONS_KEY=<long-random-secret>
 
 S3_ENDPOINT=
 S3_REGION=

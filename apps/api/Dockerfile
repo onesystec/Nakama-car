@@ -13,4 +13,8 @@ COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 
+# Run without root: a bug in the app cannot take over the container.
+RUN useradd --system --uid 10001 --no-create-home nakama
+USER nakama
+
 CMD ["sh", "-c", "alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

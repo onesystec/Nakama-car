@@ -22,6 +22,7 @@ from app.schemas.media import (
 from app.security.context import AuthContext, require_permission
 from app.services.photos import MAX_UPLOAD_BYTES, PhotoError, prepare_photo
 from app.services.storage import S3StorageService, StorageNotConfiguredError
+from app.services.uploads import read_body
 
 router = APIRouter(prefix="/cases/{repair_case_id}/media", tags=["media"])
 settings = get_settings()
@@ -189,7 +190,7 @@ async def upload_photo_direct(
     if declared > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Foto troppo grande (max 15 MB).")
     try:
-        content, width, height = prepare_photo(await request.body())
+        content, width, height = prepare_photo(await read_body(request, MAX_UPLOAD_BYTES, "Foto troppo grande (max 15 MB)."))
     except PhotoError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     media = Media(

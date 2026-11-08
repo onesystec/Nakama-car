@@ -84,7 +84,7 @@ const it: Record<LegalDoc, Document> = {
       ] },
       { title: "4. Sei obbligato a darci i dati?", text: ["I dati richiesti sono quelli necessari per i lavori e per la fattura: senza di essi non possiamo eseguire il servizio. I campi facoltativi restano facoltativi."] },
       { title: "5. A chi comunichiamo i dati", text: ["I dati non vengono diffusi. Possono riceverli, solo per quanto necessario:"], items: [
-        "fornitori tecnici nominati responsabili del trattamento (art. 28 GDPR): hosting dell'app e del database (Railway Corporation), pubblicazione del sito (Vercel Inc.), archivio di foto e documenti (" + c.storage + "), servizio di dati del veicolo dalla targa (RegCheck / targa.co.it), immagini illustrative dei modelli (carimage.dev), software di contabilità e fatturazione (DATEV Koinos / SuperBill);",
+        "fornitori tecnici nominati responsabili del trattamento (art. 28 GDPR): hosting dell'app e del database (Railway Corporation), pubblicazione del sito (Vercel Inc.), archivio di foto e documenti (" + c.storage + "), servizio di dati del veicolo dalla targa (RegCheck / targa.co.it), immagini illustrative dei modelli (carimage.dev), software di contabilità e fatturazione (DATEV Koinos / SuperBill), assistente digitale dell'officina collegato con chiave API in sola lettura, se attivato;",
         "commercialista e consulenti, Agenzia delle Entrate e Sistema di Interscambio per le fatture;",
         "autorità pubbliche, quando la legge lo richiede.",
       ] },
@@ -181,7 +181,7 @@ const es: Record<LegalDoc, Document> = {
       ] },
       { title: "4. ¿Es obligatorio darnos los datos?", text: ["Los datos que pedimos son los necesarios para los trabajos y la factura: sin ellos no podemos prestar el servicio. Los campos opcionales siguen siendo opcionales."] },
       { title: "5. A quién comunicamos los datos", text: ["Los datos no se publican. Pueden recibirlos, solo en lo necesario:"], items: [
-        "proveedores técnicos nombrados encargados del tratamiento (art. 28 RGPD): alojamiento de la app y la base de datos (Railway Corporation), publicación de la web (Vercel Inc.), archivo de fotos y documentos (" + c.storage + "), datos del vehículo a partir de la matrícula (RegCheck / targa.co.it), imágenes ilustrativas de modelos (carimage.dev), software de contabilidad y facturación (DATEV Koinos / SuperBill);",
+        "proveedores técnicos nombrados encargados del tratamiento (art. 28 RGPD): alojamiento de la app y la base de datos (Railway Corporation), publicación de la web (Vercel Inc.), archivo de fotos y documentos (" + c.storage + "), datos del vehículo a partir de la matrícula (RegCheck / targa.co.it), imágenes ilustrativas de modelos (carimage.dev), software de contabilidad y facturación (DATEV Koinos / SuperBill), asistente digital del taller conectado con clave API de solo lectura, si está activado;",
         "gestor y asesores, Agenzia delle Entrate y Sistema di Interscambio para las facturas;",
         "autoridades públicas, cuando la ley lo exige.",
       ] },

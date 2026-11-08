@@ -9,6 +9,7 @@ from app.db.deps import get_db
 from app.models.garage import Customer, Vehicle
 from app.security.context import AuthContext, require_permission
 from app.services import fleet
+from app.services.uploads import read_body
 
 router = APIRouter(tags=["fleet"])
 
@@ -44,7 +45,7 @@ async def import_customer_fleet(
 ):
     """The raw file is the request body; with dry_run=true the result is only a preview."""
     customer = tenant_customer(db, auth.tenant_id, customer_id)
-    content = await request.body()
+    content = await read_body(request)
     try:
         return fleet.import_fleet(db, customer, content, filename, dry_run)
     except fleet.ImportFileError as exc:

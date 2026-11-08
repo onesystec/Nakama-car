@@ -49,7 +49,7 @@ def test_tracking_link_progress_and_chat(client):
     assert unread[0]["unread"] == 1 and unread[0]["plate"] == "FL123TR"
 
     staff = c.get(base + "/messages").json()
-    assert staff[0]["author_name"] == "Luca"
+    assert staff[0]["author_name"] == "Univex Group"  # the typed name is ignored
     assert c.get("/api/v1/messages/unread").json() == []
     reply = c.post(base + "/messages", json={"body": "Domani alle 17"})
     assert reply.status_code == 201 and reply.json()["sender"] == "WORKSHOP"

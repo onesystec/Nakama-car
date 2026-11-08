@@ -4,7 +4,7 @@ import hashlib
 import secrets
 from datetime import datetime, timezone
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,9 +25,18 @@ def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def _fernet() -> Fernet:
-    digest = hashlib.sha256((get_settings().jwt_secret + "|integrations").encode()).digest()
+def _key(secret: str) -> Fernet:
+    digest = hashlib.sha256((secret + "|integrations").encode()).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _fernet() -> MultiFernet:
+    """INTEGRATIONS_KEY encrypts when set, so a leaked or rotated JWT_SECRET no longer touches these
+    secrets; the JWT_SECRET-derived key still reads secrets saved before it was set."""
+    settings = get_settings()
+    keys = [_key(settings.integrations_key)] if settings.integrations_key else []
+    keys.append(_key(settings.jwt_secret))
+    return MultiFernet(keys)
 
 
 def encrypt_secret(value: str) -> str:

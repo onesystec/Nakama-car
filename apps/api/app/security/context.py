@@ -3,9 +3,9 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 
 from app.core.config import get_settings
+from app.security.tokens import TokenError, decode_token
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.deps import get_db
@@ -24,7 +24,7 @@ def get_auth_context(credentials: HTTPAuthorizationCredentials | None = Depends(
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     try:
-        payload = jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = decode_token(credentials.credentials)
         if payload.get("type") != "access":
             raise ValueError("Invalid token type")
         user_id = UUID(payload["sub"])
@@ -39,7 +39,7 @@ def get_auth_context(credentials: HTTPAuthorizationCredentials | None = Depends(
             tenant_id=UUID(payload["tenant_id"]),
             permissions=frozenset(payload.get("permissions", [])),
         )
-    except (JWTError, KeyError, ValueError):
+    except (TokenError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 def require_permission(permission: str):

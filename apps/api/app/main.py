@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.core.config import get_settings, is_production
 from app.services import preview
 
 
@@ -34,7 +35,13 @@ async def lifespan(_: FastAPI):
     yield
 
 
+# The interactive API docs stay off in production: they hand out a map of every endpoint.
+API_DOCS = not is_production(get_settings())
+
 app = FastAPI(
+    docs_url="/docs" if API_DOCS else None,
+    redoc_url="/redoc" if API_DOCS else None,
+    openapi_url="/openapi.json" if API_DOCS else None,
     title="NAKAMA CAR ESTIMATE API",
     version="0.2.0",
     description="Multi-tenant estimating platform developed by ONE SISTEM.",
@@ -48,8 +55,9 @@ app.add_middleware(
         "https://web-theta-umber-70.vercel.app",
         "https://nakama-car-web-production.up.railway.app",
     ],
-    # Vercel previews and the web copies of Railway PR environments (nakama-car-web-<environment>.up.railway.app).
-    allow_origin_regex=r"https://.*\.vercel\.app|https://nakama-car-web-[a-z0-9-]+\.up\.railway\.app",
+    # Web copies of Railway PR environments (nakama-car-web-<environment>.up.railway.app). Any other
+    # *.vercel.app site is not trusted: anyone can publish one.
+    allow_origin_regex=r"https://nakama-car-web-[a-z0-9-]+\.up\.railway\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

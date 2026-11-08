@@ -7,8 +7,8 @@ client (web / Android / Mac), IP address and browser.
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import Request
-from sqlalchemy import delete
+from fastapi import HTTPException, Request
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.identity import AccessLog
@@ -17,16 +17,39 @@ from app.models.identity import AccessLog
 LEGAL_VERSION = "2026-10-23"
 RETENTION_DAYS = 365
 
+# Password guessing: after this many wrong passwords in the window, the account (or the address) waits.
+MAX_FAILED_LOGINS_PER_ACCOUNT = 5
+MAX_FAILED_LOGINS_PER_IP = 20
+FAILED_LOGIN_WINDOW_MINUTES = 15
+
 
 def client_ip(request: Request | None) -> str | None:
-    """Real visitor address: Railway/Vercel put it first in X-Forwarded-For."""
+    """Real visitor address, as seen by the hosting proxy.
+
+    Only the last X-Forwarded-For entry counts: the hosting proxy adds it. Anything before it (or an
+    X-Real-IP header) may have been written by the visitor to fake another address.
+    """
     if request is None:
         return None
-    forwarded = request.headers.get("x-forwarded-for", "")
-    first = forwarded.split(",")[0].strip()
-    if first:
-        return first[:64]
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    if forwarded:
+        return forwarded[-1][:64]
     return request.client.host if request.client else None
+
+
+def check_login_allowed(db: Session, request: Request | None, email: str) -> None:
+    """Stop password guessing: too many recent wrong passwords for this email or from this address → 429."""
+    since = datetime.now(timezone.utc) - timedelta(minutes=FAILED_LOGIN_WINDOW_MINUTES)
+    recent = select(func.count(AccessLog.id)).where(AccessLog.event == "LOGIN_FAILED", AccessLog.created_at >= since)
+    by_account = db.scalar(recent.where(func.lower(AccessLog.email) == email.lower())) or 0
+    ip = client_ip(request)
+    by_ip = (db.scalar(recent.where(AccessLog.ip_address == ip)) or 0) if ip else 0
+    if by_account >= MAX_FAILED_LOGINS_PER_ACCOUNT or by_ip >= MAX_FAILED_LOGINS_PER_IP:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Troppi tentativi falliti: riprova tra {FAILED_LOGIN_WINDOW_MINUTES} minuti.",
+            headers={"Retry-After": str(FAILED_LOGIN_WINDOW_MINUTES * 60)},
+        )
 
 
 def client_kind(user_agent: str | None) -> str:
