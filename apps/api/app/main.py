@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings, is_production
+from app.core.onesystec_control import OnesystecControl
 from app.services import preview
 
 
@@ -47,6 +48,11 @@ app = FastAPI(
     description="Multi-tenant estimating platform developed by ONE SISTEM.",
     lifespan=lifespan,
 )
+
+# ONESYSTEC GENERALE switch (GENERALE_URL / GENERALE_KEY): when the app is switched off in the portal the API
+# answers 503 APP_SUSPENDIDA (except /health). Without those variables it does nothing. Added before CORS so CORS
+# wraps it and the browser can read the 503.
+app.add_middleware(OnesystecControl)
 
 app.add_middleware(
     CORSMiddleware,

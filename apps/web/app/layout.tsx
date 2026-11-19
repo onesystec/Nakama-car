@@ -2,6 +2,7 @@ import "./globals.css";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { LanguageProvider } from "../components/LanguageProvider";
 import { UpdateWatcher } from "../components/UpdateWatcher";
+import { AppSuspendida } from "../components/AppSuspendida";
 
 export const metadata = {
   title: "NAKAMA CAR ESTIMATE",
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="it">
       <head><script dangerouslySetInnerHTML={{ __html: loginGate }} /></head>
-      <body><LanguageProvider><ThemeProvider>{children}<UpdateWatcher /></ThemeProvider></LanguageProvider></body>
+      <body><LanguageProvider><ThemeProvider>{children}<UpdateWatcher /><AppSuspendida /></ThemeProvider></LanguageProvider></body>
     </html>
   );
 }
