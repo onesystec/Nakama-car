@@ -21,8 +21,18 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     const detail = await response.clone().json().then((data) => data?.detail, () => undefined);
     if (detail === "PASSWORD_CHANGE_REQUIRED") handleExpiredSession();
   }
+  // ONESYSTEC GENERALE switched the app off: the API answers 503 APP_SUSPENDIDA and the maintenance screen shows.
+  else if (response.status === 503 && typeof window !== "undefined") {
+    const data = await response.clone().json().catch(() => undefined);
+    if (data?.code === "APP_SUSPENDIDA") {
+      window.dispatchEvent(new CustomEvent(APP_SUSPENDIDA_EVENT, { detail: typeof data.mensaje === "string" ? data.mensaje : "" }));
+    }
+  }
   return response;
 }
+
+/** Fired by apiFetch when ONESYSTEC GENERALE has the app switched off (503 APP_SUSPENDIDA). */
+export const APP_SUSPENDIDA_EVENT = "nakama:app-suspendida";
 
 /** The session token expired or was revoked: go back to login and return here afterwards. */
 function handleExpiredSession() {
