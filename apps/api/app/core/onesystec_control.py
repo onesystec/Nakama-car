@@ -21,7 +21,7 @@ EVERY_SECONDS = 30
 class _Estado:
     def __init__(self, base: str, key: str):
         self.base, self.key = base.rstrip("/"), key
-        self.activa, self.mensaje = True, ""
+        self.activa, self.mensaje, self.motivo = True, "", ""
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self):
@@ -37,6 +37,7 @@ class _Estado:
                 data = json.load(res)
             self.activa = data.get("activa") is not False
             self.mensaje = str(data.get("mensaje") or "")
+            self.motivo = str(data.get("motivo") or "")  # "mantenimiento", "apagada", "pago" o "acceso"
         except Exception:
             pass  # sin conexión o clave incorrecta: se mantiene el último estado conocido
 
@@ -52,5 +53,5 @@ class OnesystecControl(BaseHTTPMiddleware):
         e = self.estado
         if e is None or e.activa or request.method == "OPTIONS" or request.url.path.startswith(self.exempt):
             return await call_next(request)
-        return JSONResponse({"code": "APP_SUSPENDIDA", "detail": e.mensaje, "mensaje": e.mensaje},
+        return JSONResponse({"code": "APP_SUSPENDIDA", "detail": e.mensaje, "mensaje": e.mensaje, "motivo": e.motivo},
                             status_code=503, headers={"Retry-After": "60"})

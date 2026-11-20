@@ -13,7 +13,7 @@ class FixedState:
     """Replaces the GENERALE poll (no network, no thread) with a fixed 'off' state."""
 
     def __init__(self, base, key):
-        self.activa, self.mensaje = False, "Manutenzione programmata"
+        self.activa, self.mensaje, self.motivo = False, "Manutenzione programmata", "mantenimiento"
 
 
 def mini_app():
@@ -37,7 +37,7 @@ def test_switched_off_answers_503_except_health(monkeypatch):
     client = TestClient(mini_app())
     response = client.get("/cases")
     assert response.status_code == 503
-    assert response.json() == {"code": "APP_SUSPENDIDA", "detail": "Manutenzione programmata", "mensaje": "Manutenzione programmata"}
+    assert response.json() == {"code": "APP_SUSPENDIDA", "detail": "Manutenzione programmata", "mensaje": "Manutenzione programmata", "motivo": "mantenimiento"}
     assert client.get("/api/v1/health").status_code == 200
 
 
