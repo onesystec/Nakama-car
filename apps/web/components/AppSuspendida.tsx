@@ -112,8 +112,13 @@ export function AppSuspendida() {
         {suspendido ? t("Servizio sospeso") : t("Nakama Car è in manutenzione")}
       </h1>
       <p id="app-suspendida-texto" style={{ maxWidth: 440, margin: 0, fontSize: 16, lineHeight: 1.6, color: "#d1d5db" }}>
-        {estado.mensaje || (suspendido ? t("Il servizio è sospeso. Per riattivarlo, contatta il tuo fornitore del servizio.") : t("Stiamo facendo manutenzione. Torna disponibile a breve."))}
+        {suspendido ? t("Il servizio è sospeso. Per riattivarlo, contatta il tuo fornitore del servizio.") : t("Stiamo facendo manutenzione. Torna disponibile a breve.")}
       </p>
+      {estado.mensaje && (
+        <p style={{ maxWidth: 440, margin: 0, padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,.15)", background: "rgba(255,255,255,.06)", fontSize: 15, lineHeight: 1.5, color: "#f3f4f6" }}>
+          {estado.mensaje}
+        </p>
+      )}
       {suspendido ? (
         <p
           style={{
