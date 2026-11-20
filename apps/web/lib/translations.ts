@@ -1,6 +1,12 @@
 export type Language = "it" | "es";
 
 export const spanish: Record<string, string> = {
+  "Nakama Car è in manutenzione": "Nakama Car está en mantenimiento",
+  "Caricamento": "Cargando",
+  "Controlliamo da soli ogni 30 secondi: l'app si riapre appena torna attiva.": "Lo comprobamos solos cada 30 segundos: la app se abre en cuanto vuelva.",
+  "Servizio sospeso": "Servicio suspendido",
+  "Il servizio è sospeso. Per riattivarlo, contatta il tuo fornitore del servizio.": "El servicio está suspendido. Para reactivarlo, ponte en contacto con tu proveedor del servicio.",
+  "Per qualsiasi informazione, contatta il tuo fornitore del servizio.": "Para cualquier información, contacta con tu proveedor del servicio.",
   "Accettato": "Aceptado",
   "Da valutare": "Por evaluar",
   "Segnare il preventivo come accettato? Il lavoro passa in officina e il preventivo non sarà più modificabile.": "¿Marcar el presupuesto como aceptado? El trabajo pasa al taller y el presupuesto ya no se podrá modificar.",

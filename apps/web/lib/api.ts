@@ -25,7 +25,9 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   else if (response.status === 503 && typeof window !== "undefined") {
     const data = await response.clone().json().catch(() => undefined);
     if (data?.code === "APP_SUSPENDIDA") {
-      window.dispatchEvent(new CustomEvent(APP_SUSPENDIDA_EVENT, { detail: typeof data.mensaje === "string" ? data.mensaje : "" }));
+      const mensaje = typeof data.mensaje === "string" ? data.mensaje : "";
+      const motivo = typeof data.motivo === "string" ? data.motivo : "";
+      window.dispatchEvent(new CustomEvent(APP_SUSPENDIDA_EVENT, { detail: { mensaje, motivo } }));
     }
   }
   return response;
