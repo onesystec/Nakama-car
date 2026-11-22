@@ -1,6 +1,7 @@
 """Fleet customer portal: the workshop creates logins, the customer follows its vehicles."""
 import hashlib
 import re
+from functools import partial
 import secrets
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -8,15 +9,17 @@ from io import BytesIO
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from fastapi.responses import Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.v1.billing import invoice_context, invoice_lines, tenant_settings
+from app.api.v1.vehicles import resolve_plate_data
 from app.core.config import get_settings
 from app.db.deps import get_db
 from app.models.approval import EstimateApproval
@@ -35,6 +38,7 @@ from app.services.audit import record_audit
 from app.services.pdf import build_invoice_pdf
 from app.services.integrations import latest_reading
 from app.services.maintenance import maintenance_status
+from app.services.uploads import read_body
 
 router = APIRouter(tags=["portal"])
 settings = get_settings()
@@ -336,8 +340,10 @@ def register_invitation(payload: InvitationRegistration, request: Request, db: S
         customer_type = payload.profile.customer_type or customer.customer_type
         profile = {key: value.strip() for key, value in payload.profile.model_dump(exclude_none=True, exclude={"customer_type"}).items()}
         required = ("first_name", "last_name", "phone", "address", "city", "postal_code", "province", "country")
-        # A company is identified by its partita IVA; the codice fiscale is for private people.
-        required += ("company_name", "vat_number") if customer_type == CustomerType.COMPANY else ("tax_code",)
+        if customer_type == CustomerType.COMPANY:
+            required += ("company_name", "vat_number")
+        else:
+            required += ("tax_code",)
         if any(not profile.get(field) for field in required):
             raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
         profile["country"] = profile["country"].upper()
@@ -743,6 +749,81 @@ def portal_add_vehicle(payload: PortalVehicleCreate, db: Session = Depends(get_d
     db.commit()
     db.refresh(vehicle)
     return vehicle_summary(db, vehicle)
+
+
+def portal_registered_plates(db: Session, context: PortalContext) -> set[str]:
+    plates = db.scalars(select(Vehicle.license_plate).where(Vehicle.tenant_id == context.tenant_id))
+    return {fleet.normalize_plate(plate) for plate in plates}
+
+
+def portal_import_result(db: Session, context: PortalContext, content: bytes, filename: str, preview: bool) -> dict:
+    try:
+        rows = fleet.portal_import_rows(content, filename)
+    except fleet.ImportFileError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    registered = portal_registered_plates(db, context)
+    created = 0
+    for row in rows:
+        if row["status"] != "pending":
+            continue
+        plate = row["license_plate"]
+        if plate in registered:
+            row["status"] = "existing"
+            continue
+        if preview:
+            continue
+        try:
+            lookup = resolve_plate_data(db, context.tenant_id, plate, cached_only=True)
+            fields = {"make": 120, "model": 120, "version": 160, "vin": 32, "fuel_type": 40, "engine_size": 20}
+            details = {field: value[:limit] for field, limit in fields.items()
+                       if (value := getattr(lookup, field))}
+            details.update(year=lookup.year, power_kw=lookup.power_kw)
+        except HTTPException as exc:
+            if exc.status_code not in (404, 422):
+                raise
+            details = {}
+        vehicle = Vehicle(tenant_id=context.tenant_id, customer_id=context.customer_id,
+                          license_plate=plate, fleet_number=row["fleet_number"], mileage=None, **details)
+        try:
+            with db.begin_nested():
+                db.add(vehicle)
+                db.flush()
+        except IntegrityError:
+            if plate not in portal_registered_plates(db, context):
+                raise
+            row["status"] = "existing"
+            continue
+        row.update(status="created", make=vehicle.make, model=vehicle.model, year=vehicle.year)
+        created += 1
+    if not preview:
+        db.commit()
+    return {"rows": rows, "created": created}
+
+
+@router.get("/portal/vehicle-import/template")
+def portal_import_template(context: PortalContext = Depends(get_portal_context)):
+    return Response(fleet.template_workbook(portal=True),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="modello-flotta.xlsx"'})
+
+
+@router.post("/portal/vehicle-import")
+async def portal_import_vehicles(
+    request: Request, filename: str = Query("", max_length=255), preview: bool = True,
+    db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context),
+):
+    content = await read_body(request)
+    return await run_in_threadpool(partial(portal_import_result, db, context, content, filename, preview))
+
+
+@router.get("/portal/vehicle-import/plate/{plate}")
+def portal_import_plate(plate: str, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+    if not re.fullmatch(r"[A-Z0-9]{5,8}", plate):
+        raise HTTPException(status_code=422, detail="Invalid plate")
+    if plate in portal_registered_plates(db, context):
+        raise HTTPException(status_code=409, detail="Plate already registered")
+    lookup = resolve_plate_data(db, context.tenant_id, plate)
+    return {"make": lookup.make, "model": lookup.model, "year": lookup.year}
 
 
 @router.get("/portal/estimates")

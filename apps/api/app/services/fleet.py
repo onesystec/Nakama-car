@@ -434,15 +434,40 @@ def import_fleet(db: Session, customer: Customer, content: bytes, filename: str,
     }
 
 
-def template_workbook() -> bytes:
+def portal_import_rows(content: bytes, filename: str) -> list[dict]:
+    """Read only plate and fleet number from the customer's file."""
+    table = read_table(content, filename)
+    header, mapping = find_header(table)
+    mapping = {index: field for index, field in mapping.items() if field in ("license_plate", "fleet_number")}
+    rows = []
+    seen = set()
+    for number, row in enumerate(table[header + 1:], start=header + 2):
+        if blank(row):
+            continue
+        data, _ = clean_row(row, mapping)
+        plate = data.get("license_plate", "")
+        valid = 5 <= len(plate) <= 10 and any(char.isdigit() for char in plate)
+        status = "invalid" if not valid else "duplicate" if plate in seen else "pending"
+        if valid:
+            seen.add(plate)
+        rows.append({"row": number, "license_plate": plate, "fleet_number": data.get("fleet_number"), "status": status})
+    if not rows:
+        raise ImportFileError("Il file non contiene veicoli.")
+    if len(rows) > 250:
+        raise ImportFileError("Puoi importare fino a 250 righe per file.")
+    return rows
+
+
+def template_workbook(*, portal: bool = False) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font
 
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Flotta"
-    sheet.append([label for _, label in TEMPLATE_HEADERS])
-    sheet.append(TEMPLATE_EXAMPLE)
+    sheet.append(["Targa", "N. flotta"] if portal else [label for _, label in TEMPLATE_HEADERS])
+    if not portal:
+        sheet.append(TEMPLATE_EXAMPLE)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
     for column in sheet.columns:

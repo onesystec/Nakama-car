@@ -265,8 +265,133 @@ const emptyVehicle = { license_plate: "", make: "", model: "", year: "", fleet_n
 const fuels = ["Benzina", "Diesel", "GPL", "Metano", "Ibrida", "Elettrica"];
 
 /** The customer can only add vehicles: changes and removals go through the workshop. */
+type ImportRow = {
+  row: number; license_plate: string; status: string;
+  make?: string; model?: string; year?: number;
+};
+
+function PortalFleetImport({ onImported }: { onImported: () => void }) {
+  const { language } = useLanguage();
+  const label = (it: string, es: string) => language === "es" ? es : it;
+  const [file, setFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<ImportRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const controller = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controller.current?.abort(), []);
+
+  async function downloadTemplate() {
+    try {
+      const response = await portalFetch("/portal/vehicle-import/template");
+      if (!response.ok) throw new Error();
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "modello-flotta.xlsx";
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setError(label("Modello non disponibile.", "Plantilla no disponible."));
+    }
+  }
+
+  async function submit(selected: File, preview: boolean) {
+    setBusy(true);
+    setError("");
+    setResult(null);
+    const request = new AbortController();
+    controller.current = request;
+    const signal = request.signal;
+    const fallback = label("Importazione non riuscita.", "No se pudo importar.");
+    try {
+      const params = new URLSearchParams({ filename: selected.name, preview: String(preview) });
+      const response = await portalFetch(`/portal/vehicle-import?${params}`, {
+        method: "POST", body: selected, headers: { "Content-Type": "application/octet-stream" }, signal,
+      });
+      if (!response.ok) throw new Error(await portalError(response, fallback));
+      const data: { rows: ImportRow[]; created: number } = await response.json();
+      setRows(data.rows);
+      if (!preview) {
+        setResult(data.created);
+        onImported();
+        return;
+      }
+      for (const row of data.rows) {
+        if (row.status !== "pending" || signal.aborted) continue;
+        let details = {};
+        let status = "manual";
+        try {
+          const lookup = await portalFetch(`/portal/vehicle-import/plate/${encodeURIComponent(row.license_plate)}`, { signal });
+          if (lookup.status === 401) return;
+          if (lookup.ok) {
+            details = await lookup.json();
+            status = "recognized";
+          } else if (lookup.status === 409) status = "existing";
+        } catch {
+          if (signal.aborted) return;
+        }
+        setRows((current) => current.map((item) => item.row === row.row ? { ...item, ...details, status } : item));
+      }
+    } catch (failure) {
+      if (!signal.aborted) setError(failure instanceof Error && failure.message ? failure.message : fallback);
+    } finally {
+      if (!signal.aborted) setBusy(false);
+    }
+  }
+
+  const eligible = rows.filter((row) => ["pending", "manual", "recognized"].includes(row.status)).length;
+  const statuses: Record<string, string> = {
+    pending: label("Ricerca in corso", "Consultando"),
+    manual: label("Verifica manuale", "Revisión manual"),
+    recognized: label("Targa riconosciuta", "Matrícula reconocida"),
+    existing: label("Targa già registrata", "Matrícula ya registrada"),
+    duplicate: label("Targa ripetuta nel file", "Matrícula repetida en el archivo"),
+    invalid: label("Targa non valida", "Matrícula no válida"),
+    created: label("Importato", "Importado"),
+  };
+  return <div>
+    <p className="hint">{label("Carica un file Excel o CSV con la colonna Targa. I chilometri restano da inserire.", "Sube un Excel o CSV con la columna Matrícula. Los kilómetros quedan pendientes.")}</p>
+    <div className="record-form-actions">
+      <label>{label("File della flotta", "Archivo de flota")} <input type="file" accept=".xlsx,.xlsm,.csv" disabled={busy}
+        onChange={(event) => {
+          const selected = event.currentTarget.files?.[0] ?? null;
+          event.currentTarget.value = "";
+          setFile(selected);
+          setRows([]);
+          if (selected) void submit(selected, true);
+        }} /></label>
+      <button type="button" className="secondary" onClick={downloadTemplate}>{label("Scarica modello Excel", "Descargar modelo Excel")}</button>
+    </div>
+    {file && <p>{file.name}</p>}
+    {busy && <p role="status">{label("Elaborazione in corso…", "Procesando…")}</p>}
+    {error && <p className="record-error" role="alert">{error}</p>}
+    {result !== null && <p role="status">{label("Veicoli importati", "Vehículos importados")} · {result}</p>}
+    {rows.length > 0 && <div style={{ overflowX: "auto" }}>
+      <table>
+        <caption>{label("Anteprima importazione", "Vista previa de importación")}</caption>
+        <thead><tr>
+          <th scope="col">{label("Targa", "Matrícula")}</th>
+          <th scope="col">{label("Marca e modello", "Marca y modelo")}</th>
+          <th scope="col">{label("Anno", "Año")}</th><th scope="col">Km</th>
+          <th scope="col">{label("Esito", "Resultado")}</th>
+        </tr></thead>
+        <tbody>{rows.map((row) => <tr key={row.row}>
+          <td>{row.license_plate || "—"}</td><td>{[row.make, row.model].filter(Boolean).join(" ") || "—"}</td>
+          <td>{row.year ?? "—"}</td><td>{["pending", "manual", "recognized", "created"].includes(row.status) ? label("Da inserire", "Pendientes") : "—"}</td><td>{statuses[row.status]}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+    {file && eligible > 0 && <button type="button" className="primary" disabled={busy} onClick={() => void submit(file, false)}>
+      {label(`Importa ${eligible} veicoli`, `Importar ${eligible} vehículos`)}
+    </button>}
+  </div>;
+}
+
 export function PortalAddVehicle({ onAdded }: { onAdded: (id: string) => void }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const [excel, setExcel] = useState(false);
   const [form, setForm] = useState(emptyVehicle);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -326,6 +451,11 @@ export function PortalAddVehicle({ onAdded }: { onAdded: (id: string) => void })
 
   return <section className="panel portal-section">
     <h2>{t("Aggiungi veicolo")}</h2>
+    <div className="record-form-actions">
+      <button type="button" className={excel ? "secondary" : "primary"} aria-pressed={!excel} onClick={() => setExcel(false)}>{language === "es" ? "Vehículo individual" : "Veicolo singolo"}</button>
+      <button type="button" className={excel ? "primary" : "secondary"} aria-pressed={excel} onClick={() => setExcel(true)}>{language === "es" ? "Importar desde Excel" : "Importa da Excel"}</button>
+    </div>
+    {excel ? <PortalFleetImport onImported={() => onAdded("")} /> : <>
     <p className="hint">{t("Puoi aggiungere veicoli alla tua flotta. Per modificarli o eliminarli contatta l'officina.")}</p>
     {saved && <p className="portal-success" role="status">✓ {t("Veicolo salvato")}: <strong>{saved}</strong></p>}
     {error && <p className="record-error" role="alert">{t(error)}</p>}
@@ -346,6 +476,7 @@ export function PortalAddVehicle({ onAdded }: { onAdded: (id: string) => void })
         <button className="primary">{t("Salva veicolo")}</button>
       </div>
     </form>
+    </>}
 
     {confirming && <div className="portal-modal-backdrop" onClick={() => setConfirming(false)}>
       <div className="portal-modal panel" role="alertdialog" aria-modal="true" aria-labelledby="portal-confirm-title" aria-describedby="portal-confirm-text" onClick={(event) => event.stopPropagation()}>

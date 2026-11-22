@@ -346,3 +346,39 @@ def test_company_registers_without_codice_fiscale_but_private_needs_it(client):
     response = public.post(endpoint, json={**data, "profile": company})
     assert response.status_code == 201, response.text
     assert c.get(path).json()["vat_number"] == "14345540968"
+
+
+
+def test_portal_excel_import_uses_plate_data_and_leaves_mileage_blank(client, monkeypatch):
+    from fastapi import HTTPException
+    from app.api.v1 import portal as portal_routes
+    from app.schemas.garage import PlateLookupResult
+
+    c, _, _ = client
+    customer, _, vehicle, _ = fleet.create_fleet_case(c)
+    portal = portal_client(c, customer)
+    calls = []
+
+    def lookup(db, tenant_id, plate, *, cached_only=False):
+        calls.append((plate, cached_only))
+        if plate == "AB123CD":
+            return PlateLookupResult(license_plate=plate, make="Fiat", model="Ducato", year=2021,
+                                     fuel_type="Diesel", doors=4, source="test", cached=cached_only)
+        raise HTTPException(status_code=404, detail="Plate not found")
+
+    monkeypatch.setattr(portal_routes, "resolve_plate_data", lookup)
+    path = "/api/v1/portal/vehicle-import"
+    file = f"Targa;N. flotta;Km\nAB-123-CD;F-1;99999\nAB123CD;;\nEF456GH;;\n{vehicle['license_plate']};;".encode()
+    preview = portal.post(path, params={"filename": "fleet.csv"}, content=file)
+    assert [row["status"] for row in preview.json()["rows"]] == ["pending", "duplicate", "pending", "existing"]
+    assert not calls
+    assert portal.get(path + "/plate/AB123CD").json()["model"] == "Ducato"
+    assert portal.get(path + "/plate/" + vehicle["license_plate"]).status_code == 409
+    result = portal.post(path, params={"filename": "fleet.csv", "preview": "false"}, content=file)
+    assert result.json()["created"] == 2
+    assert calls == [("AB123CD", False), ("AB123CD", True), ("EF456GH", True)]
+    vehicles = {row["license_plate"]: row for row in portal.get("/api/v1/portal/vehicles").json()}
+    assert vehicles["AB123CD"]["make"] == "Fiat"
+    assert vehicles["AB123CD"]["mileage"] is None
+    assert vehicles["EF456GH"]["mileage"] is None
+    assert portal.post(path, params={"filename": "fleet.csv", "preview": "false"}, content=file).json()["created"] == 0
