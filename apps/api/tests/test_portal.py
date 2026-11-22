@@ -304,3 +304,25 @@ def test_invite_without_email_populates_existing_company(client):
                        "country": "IT", "province": "MI", "sdi": "ABC1234"}.items():
         assert updated[key] == value
     assert public.post(endpoint, json=data).status_code == 404
+
+
+def test_invite_without_email_lets_client_register_as_private(client):
+    c, _, _ = client
+    customer, _, _, _ = fleet.create_fleet_case(c)
+    path = f"/api/v1/customers/{customer['id']}"
+    token = c.post(path + "/portal-invitations", json={}).json()["token"]
+    public = c.__class__(c.app)
+    profile = {
+        "customer_type": "PRIVATE", "first_name": "Maria", "last_name": "Rossi",
+        "tax_code": "rssmra80a41f205x", "phone": "3331234567", "address": "Via Verdi 2",
+        "postal_code": "20100", "city": "Milano", "province": "MI", "country": "IT",
+    }
+    response = public.post("/api/v1/portal/invitations/register", json={
+        "token": token, "full_name": "Maria Rossi", "email": "maria@example.com",
+        "password": "example-long-password", "profile": profile,
+    })
+    assert response.status_code == 201, response.text
+    updated = c.get(path).json()
+    assert updated["customer_type"] == "PRIVATE"
+    assert updated["company_name"] is None and updated["vat_number"] is None
+    assert (updated["first_name"], updated["tax_code"]) == ("Maria", "RSSMRA80A41F205X")

@@ -65,6 +65,9 @@ class InvitationToken(BaseModel):
 
 
 class InvitationProfile(BaseModel):
+    # The client says whether they register as a company or a private person;
+    # without it the type already on the customer record is kept.
+    customer_type: CustomerType | None = None
     first_name: str = Field(min_length=1, max_length=120)
     last_name: str = Field(min_length=1, max_length=120)
     company_name: str | None = Field(default=None, max_length=180)
@@ -330,16 +333,17 @@ def register_invitation(payload: InvitationRegistration, request: Request, db: S
         if payload.email is None or payload.profile is None:
             raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
         account.email = payload.email.lower()
-        profile = {key: value.strip() for key, value in payload.profile.model_dump(exclude_none=True).items()}
+        customer_type = payload.profile.customer_type or customer.customer_type
+        profile = {key: value.strip() for key, value in payload.profile.model_dump(exclude_none=True, exclude={"customer_type"}).items()}
         required = ("first_name", "last_name", "tax_code", "phone", "address", "city", "postal_code", "province", "country")
-        if customer.customer_type == CustomerType.COMPANY:
+        if customer_type == CustomerType.COMPANY:
             required += ("company_name", "vat_number")
         if any(not profile.get(field) for field in required):
             raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
         profile["country"] = profile["country"].upper()
         profile["tax_code"] = profile["tax_code"].upper()
         profile["province"] = profile["province"].upper()
-        if customer.customer_type == CustomerType.COMPANY:
+        if customer_type == CustomerType.COMPANY:
             vat = profile["vat_number"].upper().replace(" ", "")
             if profile["country"] == "IT":
                 vat = vat.removeprefix("IT")
@@ -353,13 +357,22 @@ def register_invitation(payload: InvitationRegistration, request: Request, db: S
         else:
             for field in ("company_name", "vat_number", "pec", "sdi"):
                 profile.pop(field, None)
+            if customer.customer_type == CustomerType.COMPANY:
+                # A record the workshop opened as a company, claimed by a private person:
+                # the company data no longer describes them.
+                for field in ("company_name", "vat_number", "sdi"):
+                    setattr(customer, field, None)
+        changed = sorted([*profile, "email"])
+        if customer.customer_type != customer_type:
+            customer.customer_type = customer_type
+            changed = sorted([*changed, "customer_type"])
         for field, value in profile.items():
             if value:
                 setattr(customer, field, value)
         customer.email = account.email
         record_audit(db, tenant_id=account.tenant_id, user_id=None, entity_type="customer",
                      entity_id=customer.id, action="profile_registered",
-                     new_value={"changed_fields": sorted([*profile, "email"])})
+                     new_value={"changed_fields": changed})
     account.full_name = full_name
     account.password_hash = hash_password(payload.password)
     account.active = True
