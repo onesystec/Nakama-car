@@ -61,7 +61,7 @@ const it: Record<LegalDoc, Document> = {
     title: "Informativa sul trattamento dei dati personali",
     intro: "Ai sensi degli artt. 13 e 14 del Regolamento (UE) 2016/679 (GDPR) e del D.Lgs. 196/2003 (Codice privacy), ti spieghiamo quali dati trattiamo con l'app NAKAMA CAR, perché, per quanto tempo e quali sono i tuoi diritti.",
     sections: [
-      { title: "1. Titolare del trattamento", text: [`${c.name}, P.IVA ${c.vat}, sede ${c.address}. Contatti per la privacy: ${c.email}.`] }
+      { title: "1. Titolare del trattamento", text: [`${c.name}, P.IVA ${c.vat}, sede ${c.address}. Contatti per la privacy: ${c.email}.`] },
       { title: "2. Quali dati trattiamo", items: [
         "Clienti: nome e cognome o ragione sociale, codice fiscale o partita IVA, indirizzo, telefono, email, PEC e codice SDI (solo quelli che servono per i lavori e per la fattura).",
         "Veicoli: targa, telaio (VIN), marca, modello, chilometri, foto del veicolo e dei danni, lavori, preventivi, fatture e scadenze di manutenzione.",
@@ -159,7 +159,7 @@ const es: Record<LegalDoc, Document> = {
     title: "Política de privacidad",
     intro: "Según los arts. 13 y 14 del Reglamento (UE) 2016/679 (RGPD) y el D.Lgs. 196/2003 (Código de privacidad italiano), te explicamos qué datos tratamos con la app NAKAMA CAR, por qué, durante cuánto tiempo y cuáles son tus derechos. En caso de duda prevalece la versión italiana.",
     sections: [
-      { title: "1. Responsable del tratamiento", text: [`${c.name}, P.IVA ${c.vat}, sede ${c.address}. Contacto de privacidad: ${c.email}.`] }
+      { title: "1. Responsable del tratamiento", text: [`${c.name}, P.IVA ${c.vat}, sede ${c.address}. Contacto de privacidad: ${c.email}.`] },
       { title: "2. Qué datos tratamos", items: [
         "Clientes: nombre y apellidos o razón social, código fiscal o P.IVA, dirección, teléfono, email, PEC y código SDI (solo los necesarios para los trabajos y la factura).",
         "Vehículos: matrícula, bastidor (VIN), marca, modelo, kilómetros, fotos del vehículo y de los daños, trabajos, presupuestos, facturas y vencimientos de mantenimiento.",
