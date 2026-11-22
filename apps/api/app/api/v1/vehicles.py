@@ -106,6 +106,10 @@ def lookup_plate_data(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_permission("vehicle.write")),
 ):
+    return resolve_plate_data(db, auth.tenant_id, license_plate)
+
+
+def resolve_plate_data(db: Session, tenant_id: UUID, license_plate: str, *, cached_only: bool = False) -> PlateLookupResult:
     """Make/model/version for an Italian plate from the external provider.
 
     Each real lookup costs one credit, so results are cached per plate and the
@@ -115,13 +119,9 @@ def lookup_plate_data(
     if not 5 <= len(plate) <= 8:
         raise HTTPException(status_code=422, detail="Invalid plate")
     settings = get_settings()
-    provider = targa.get_vehicle_data_provider()
-    if provider is None:
-        raise HTTPException(status_code=503, detail="Plate lookup not configured")
-
     previous = db.scalar(
         select(VehicleLookup)
-        .where(VehicleLookup.tenant_id == auth.tenant_id, VehicleLookup.license_plate == plate)
+        .where(VehicleLookup.tenant_id == tenant_id, VehicleLookup.license_plate == plate)
         .order_by(VehicleLookup.created_at.desc())
         .limit(1)
     )
@@ -133,7 +133,13 @@ def lookup_plate_data(
         if not previous.found and age < timedelta(days=NEGATIVE_CACHE_DAYS):
             raise HTTPException(status_code=404, detail="Plate not found")
 
-    if monthly_lookups(db, auth.tenant_id) >= settings.plate_lookup_monthly_limit:
+    if cached_only:
+        raise HTTPException(status_code=404, detail="Plate not found in cache")
+    provider = targa.get_vehicle_data_provider()
+    if provider is None:
+        raise HTTPException(status_code=503, detail="Plate lookup not configured")
+
+    if monthly_lookups(db, tenant_id) >= settings.plate_lookup_monthly_limit:
         raise HTTPException(status_code=429, detail="Monthly plate lookup limit reached")
 
     try:
@@ -151,7 +157,7 @@ def lookup_plate_data(
             "raw": vehicle.raw,
         }
     db.add(VehicleLookup(
-        tenant_id=auth.tenant_id,
+        tenant_id=tenant_id,
         license_plate=plate,
         provider=getattr(provider, "name", "provider"),
         found=vehicle is not None,
