@@ -19,8 +19,13 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
         <h1>{text.title}</h1>
         <p className="legal-updated">{language === "es" ? "Última actualización" : "Ultimo aggiornamento"}: {LEGAL_UPDATED}</p>
         <p>{text.intro}</p>
-        {text.sections.map((section) => (
-          <section key={section.title}>
+        <nav aria-label={language === "es" ? "Índice" : "Indice"}>
+          <ol>{text.sections.map((section, index) => (
+            <li key={section.title}><a href={`#sezione-${index + 1}`}>{section.title.replace(/^\d+\. /, "")}</a></li>
+          ))}</ol>
+        </nav>
+        {text.sections.map((section, index) => (
+          <section key={section.title} id={`sezione-${index + 1}`}>
             <h2>{section.title}</h2>
             {section.text?.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
             {section.items && <ul>{section.items.map((item, index) => <li key={index}>{item}</li>)}</ul>}
@@ -68,7 +73,7 @@ export function LegalConsent({ value, onChange, termsLabel }: { value: LegalChoi
 
 /** Step shown after the password when the account has not accepted the current terms and privacy notice. */
 export function LegalStep({ onAccept, onCancel }: { onAccept: () => Promise<boolean>; onCancel: () => void }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [choice, setChoice] = useState<LegalChoice>({ terms: false, privacy: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -80,7 +85,7 @@ export function LegalStep({ onAccept, onCancel }: { onAccept: () => Promise<bool
   }
   return (
     <div className="auth-form legal-step">
-      <p>{t("Prima di entrare leggi e accetta i termini e l'informativa privacy. Te lo chiediamo solo la prima volta o quando cambiano.")}</p>
+      <p>{language === "es" ? "Acepta los términos de uso y confirma que has leído el aviso de privacidad." : "Accetta le condizioni d’uso e conferma di aver letto l’informativa privacy."}</p>
       <LegalConsent value={choice} onChange={setChoice} />
       {error && <div className="auth-error">{error}</div>}
       <button type="button" className="primary auth-submit" disabled={!choice.terms || !choice.privacy || saving} onClick={accept}>{saving ? t("Accesso…") : t("Accetta e continua")}</button>
