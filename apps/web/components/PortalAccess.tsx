@@ -5,14 +5,20 @@ import { CustomerServiceRequests } from "./ServiceRequests";
 import { useLanguage } from "./LanguageProvider";
 import { apiError, apiFetch, hasPermission } from "../lib/api";
 
-type Account = { id: string; email: string; full_name: string; active: boolean; must_change_password: boolean; last_login_at?: string | null; temporary_password?: string };
+type Account = { id: string; email: string; full_name: string; active: boolean; must_change_password: boolean; last_login_at?: string | null; temporary_password?: string; invitation_expires_at?: string | null; suspension_reason?: string | null };
 
 /** Customer portal logins: the workshop creates them and hands the temporary password to the customer. */
 export function PortalAccess({ customerId, customerName }: { customerId: string; customerName: string }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const label = (it: string, es: string) => language === "es" ? es : it;
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [draft, setDraft] = useState({ email: "", full_name: "" });
   const [issued, setIssued] = useState<Account | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitation, setInvitation] = useState<{ url: string; expires_at: string } | null>(null);
+  const [suspension, setSuspension] = useState<Account | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [canWrite, setCanWrite] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -26,6 +32,9 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
     setCanWrite(hasPermission("customer.write"));
     setIsAdmin(hasPermission("users.manage"));
     setIssued(null);
+    setInvitation(null);
+    setInviteEmail("");
+    setSuspension(null);
     setMessage("");
     load();
   }, [load]);
@@ -49,8 +58,50 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
   }
 
   async function toggle(account: Account) {
-    const response = await apiFetch(`/portal-accounts/${account.id}`, { method: "PATCH", body: JSON.stringify({ active: !account.active }) });
-    if (response.ok) load();
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await apiFetch(`/portal-accounts/${account.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(account.active ? { active: false, suspension_reason: reason } : { active: true }),
+      });
+      if (!response.ok) {
+        setMessage(await apiError(response, label("Impossibile aggiornare l’accesso.", "No se pudo actualizar el acceso.")));
+        return;
+      }
+      setSuspension(null);
+      setReason("");
+      await load();
+    } catch {
+      setMessage(label("Server non raggiungibile.", "No se pudo conectar con el servidor."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function invite(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setInvitation(null);
+    setMessage("");
+    try {
+      const response = await apiFetch(`/customers/${customerId}/portal-invitations`, {
+        method: "POST", body: JSON.stringify({ email: inviteEmail }),
+      });
+      if (!response.ok) {
+        setMessage(await apiError(response, label("Impossibile generare il link.", "No se pudo generar el enlace.")));
+        return;
+      }
+      const { token, expires_at } = await response.json();
+      const url = new URL("/portale/login", window.location.origin);
+      url.hash = new URLSearchParams({ invito: token }).toString();
+      setInvitation({ url: url.href, expires_at });
+      await load();
+    } catch {
+      setMessage(label("Server non raggiungibile.", "No se pudo conectar con el servidor."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function remove(account: Account) {
@@ -84,12 +135,19 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
         {accounts.map((account) => (
           <li key={account.id}>
             <span><strong>{account.full_name}</strong><small>{account.email}</small></span>
-            <span className={`status-chip${account.active ? " ok" : ""}`}>{account.active ? t("Attivo") : t("Disattivato")}</span>
+            <span className={`status-chip${account.active ? " ok" : ""}`}>{account.invitation_expires_at
+              ? new Date(account.invitation_expires_at).getTime() <= Date.now()
+                ? label("Invito scaduto", "Invitación caducada") : label("Invito in attesa", "Invitación pendiente")
+              : account.active ? t("Attivo") : label("Sospeso", "Suspendido")}</span>
             <small>{account.last_login_at ? `${t("Ultimo accesso")} ${new Date(account.last_login_at).toLocaleString("it-IT")}` : t("Mai entrato")}</small>
+            {isAdmin && account.suspension_reason && <small>{account.suspension_reason}</small>}
             {canWrite && (
               <span className="table-actions">
-                <button type="button" onClick={() => reset(account)}>{t("Nuova password")}</button>
-                <button type="button" onClick={() => toggle(account)}>{account.active ? t("Disattiva") : t("Riattiva")}</button>
+                {!account.invitation_expires_at && <button type="button" onClick={() => reset(account)}>{t("Nuova password")}</button>}
+                {isAdmin && !account.invitation_expires_at && <button type="button" disabled={busy} onClick={() => {
+                  if (account.active) { setReason(""); setSuspension(account); }
+                  else void toggle(account);
+                }}>{account.active ? label("Sospendi accesso", "Suspender acceso") : label("Riattiva accesso", "Reactivar acceso")}</button>}
                 {isAdmin && <button type="button" className="record-delete" onClick={() => remove(account)}>{t("Elimina")}</button>}
               </span>
             )}
@@ -103,6 +161,38 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
           <div className="record-form-actions"><button className="primary">{t("Crea accesso")}</button></div>
         </form>
       )}
+      {suspension && (
+        <form className="record-form portal-account-form" onSubmit={(event) => { event.preventDefault(); void toggle(suspension); }}>
+          <h4>{label("Sospendi accesso", "Suspender acceso")} · {suspension.email}</h4>
+          <label>{label("Motivo interno", "Motivo interno")}
+            <select value={reason} onChange={(event) => setReason(event.target.value)} required>
+              <option value="">{label("Seleziona un motivo", "Selecciona un motivo")}</option>
+              <option value="Pagamento in sospeso">{label("Pagamento in sospeso", "Pago pendiente")}</option>
+              <option value="Motivo amministrativo">{label("Motivo amministrativo", "Motivo administrativo")}</option>
+              <option value="Altro">{label("Altro", "Otro")}</option>
+            </select>
+          </label>
+          <button className="primary" disabled={busy}>{label("Conferma sospensione", "Confirmar suspensión")}</button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => setSuspension(null)}>{t("Annulla")}</button>
+        </form>
+      )}
+      {canWrite && <form className="record-form portal-account-form" onSubmit={invite}>
+        <h4>{label("Invita al portale", "Invitar al portal")}</h4>
+        <label>{label("Email del referente", "Correo del responsable")}
+          <input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
+        </label>
+        <div className="record-form-actions"><button className="primary" disabled={busy}>{label("Genera link", "Generar enlace")}</button></div>
+        {invitation && <div className="issued-password">
+          <label>{label("Link di registrazione", "Enlace de registro")}
+            <input readOnly value={invitation.url} onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <p className="hint">{label("Valido una sola volta fino al", "Válido una sola vez hasta el")} {new Date(invitation.expires_at).toLocaleString(language === "es" ? "es-ES" : "it-IT")}</p>
+          <button type="button" className="secondary" onClick={async () => {
+            try { await navigator.clipboard.writeText(invitation.url); setMessage(label("Link copiato.", "Enlace copiado.")); }
+            catch { setMessage(label("Seleziona e copia il link dal campo.", "Selecciona y copia el enlace del campo.")); }
+          }}>{label("Copia link", "Copiar enlace")}</button>
+        </div>}
+      </form>}
       <CustomerServiceRequests key={customerId} customerId={customerId} canWrite={canWrite} />
     </div>
   );
