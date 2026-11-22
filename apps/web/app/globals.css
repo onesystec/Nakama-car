@@ -2229,3 +2229,45 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 [data-theme="dark"] .staff-access-share { background: #1f2a1a; border-color: #5c4a22; }
 [data-theme="dark"] .staff-access-text { background: #0f1e2f; border-color: #26384d; color: #e7eef7; }
 [data-theme="dark"] .staff-pending { background: #3a2c12; color: #ffd58a; }
+
+/* Portal registration by invitation: one compact card, one short step at a time. */
+.registration-card { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.registration-brand { padding-bottom: 10px; }
+.nakama-auth-brand.registration-brand .nakama-logo { max-width: 140px; }
+.registration-copy { padding: 12px 0 8px; }
+.registration-copy h1 { font-size: 22px; }
+.registration-wizard { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.registration-progress { display: flex; gap: 6px; }
+.registration-progress span { flex: 1; height: 4px; border-radius: 4px; background: #e3e7ec; transition: background .2s; }
+.registration-progress span.done { background: var(--nakama-red); }
+.registration-step-head small { color: #8a8f95; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.registration-step-head h2 { margin: 2px 0 0; font-size: 17px; }
+.registration-body { overflow-y: auto; max-height: 340px; padding: 2px 4px 6px 2px; align-content: start; }
+.registration-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.registration-row.three { grid-template-columns: 1fr .8fr .8fr; }
+.registration-row label { min-width: 0; }
+.registration-row input { width: 100%; min-width: 0; }
+.registration-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.registration-type { display: grid; gap: 6px; justify-items: start; text-align: left; padding: 16px 14px; border: 1.5px solid #d9dce0; border-radius: 14px; background: white; cursor: pointer; color: inherit; font: inherit; }
+.registration-type:hover { border-color: var(--nakama-navy-2); }
+.registration-type.selected { border-color: var(--nakama-navy); box-shadow: 0 0 0 3px rgba(11,42,74,.12); background: #f4f8fc; }
+.registration-type-icon { font-size: 24px; }
+.registration-type strong { font-size: 15px; }
+.registration-type span:last-child { font-size: 11px; color: #6b7178; line-height: 1.4; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.registration-summary { margin: 0; padding: 10px 12px; border-radius: 10px; background: #f4f7fa; font-size: 12px; color: #3c4249; }
+.registration-hint { color: #8a8f95; font-size: 11px; }
+.registration-actions { display: flex; gap: 10px; }
+.registration-actions button { flex: 1; }
+.registration-links { display: grid; gap: 6px; margin-top: 14px; }
+.registration-done { padding: 14px; border-radius: 10px; background: #eefaf3; color: #17663f; }
+[data-theme="dark"] .registration-type { background: #0f2033; border-color: #2a4058; }
+[data-theme="dark"] .registration-type.selected { background: #15304d; border-color: #5d8fc2; }
+[data-theme="dark"] .registration-type span:last-child, [data-theme="dark"] .registration-step-head small { color: #9fb0c3; }
+[data-theme="dark"] .registration-progress span { background: #2a4058; }
+[data-theme="dark"] .registration-progress span.done { background: var(--nakama-red); }
+[data-theme="dark"] .registration-summary { background: #15304d; color: #dbe6f2; }
+@media (max-width: 640px) {
+  .registration-card { max-height: none; }
+  .registration-body { max-height: none; overflow: visible; }
+  .registration-types { grid-template-columns: 1fr; }
+}
