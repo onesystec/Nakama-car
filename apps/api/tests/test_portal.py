@@ -326,3 +326,23 @@ def test_invite_without_email_lets_client_register_as_private(client):
     assert updated["customer_type"] == "PRIVATE"
     assert updated["company_name"] is None and updated["vat_number"] is None
     assert (updated["first_name"], updated["tax_code"]) == ("Maria", "RSSMRA80A41F205X")
+
+
+def test_company_registers_without_codice_fiscale_but_private_needs_it(client):
+    c, _, _ = client
+    customer, _, _, _ = fleet.create_fleet_case(c)
+    path = f"/api/v1/customers/{customer['id']}"
+    public = c.__class__(c.app)
+    endpoint = "/api/v1/portal/invitations/register"
+    base = {
+        "first_name": "Luca", "last_name": "Verdi", "phone": "3331234567", "address": "Via Roma 1",
+        "postal_code": "20100", "city": "Milano", "province": "MI", "country": "IT",
+    }
+    token = c.post(path + "/portal-invitations", json={}).json()["token"]
+    private = {**base, "customer_type": "PRIVATE"}
+    data = {"token": token, "full_name": "Luca Verdi", "email": "luca@example.com", "password": "example-long-password"}
+    assert public.post(endpoint, json={**data, "profile": private}).status_code == 422
+    company = {**base, "customer_type": "COMPANY", "company_name": "Gamonal Trasporti", "vat_number": "14345540968"}
+    response = public.post(endpoint, json={**data, "profile": company})
+    assert response.status_code == 201, response.text
+    assert c.get(path).json()["vat_number"] == "14345540968"

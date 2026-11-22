@@ -72,7 +72,7 @@ class InvitationProfile(BaseModel):
     last_name: str = Field(min_length=1, max_length=120)
     company_name: str | None = Field(default=None, max_length=180)
     vat_number: str | None = Field(default=None, max_length=32)
-    tax_code: str = Field(min_length=1, max_length=32)
+    tax_code: str | None = Field(default=None, max_length=32)
     phone: str = Field(min_length=1, max_length=32)
     address: str = Field(min_length=1, max_length=255)
     city: str = Field(min_length=1, max_length=120)
@@ -335,13 +335,14 @@ def register_invitation(payload: InvitationRegistration, request: Request, db: S
         account.email = payload.email.lower()
         customer_type = payload.profile.customer_type or customer.customer_type
         profile = {key: value.strip() for key, value in payload.profile.model_dump(exclude_none=True, exclude={"customer_type"}).items()}
-        required = ("first_name", "last_name", "tax_code", "phone", "address", "city", "postal_code", "province", "country")
-        if customer_type == CustomerType.COMPANY:
-            required += ("company_name", "vat_number")
+        required = ("first_name", "last_name", "phone", "address", "city", "postal_code", "province", "country")
+        # A company is identified by its partita IVA; the codice fiscale is for private people.
+        required += ("company_name", "vat_number") if customer_type == CustomerType.COMPANY else ("tax_code",)
         if any(not profile.get(field) for field in required):
             raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
         profile["country"] = profile["country"].upper()
-        profile["tax_code"] = profile["tax_code"].upper()
+        if profile.get("tax_code"):
+            profile["tax_code"] = profile["tax_code"].upper()
         profile["province"] = profile["province"].upper()
         if customer_type == CustomerType.COMPANY:
             vat = profile["vat_number"].upper().replace(" ", "")

@@ -27,7 +27,9 @@ export function registrationSteps(type: CustomerType): Step[] {
 /** Profile sent to the API: only the fields that belong to the chosen type, without blanks. */
 export function registrationProfile(type: CustomerType, values: Profile) {
   const company = ["company_name", "vat_number", "pec", "sdi"];
-  const fields = Object.entries(values).filter(([key, value]) => value.trim() && (type === "COMPANY" || !company.includes(key)));
+  // The codice fiscale belongs to private people: a company is identified by its partita IVA.
+  const fields = Object.entries(values).filter(([key, value]) => value.trim() &&
+    (type === "COMPANY" ? key !== "tax_code" : !company.includes(key)));
   return { customer_type: type, ...Object.fromEntries(fields.filter(([key]) => key !== "email")) };
 }
 
@@ -191,10 +193,7 @@ function Wizard({ initialType, busy, error, onMismatch, onSend }: FormProps & { 
         </div>}
         {step === "company" && <>
           {field("company_name", label("Ragione sociale", "Razón social"), { autoComplete: "organization", maxLength: 180, required: true })}
-          <div className="registration-row">
-            {field("vat_number", label("Partita IVA", "Número de IVA"), { maxLength: 32, required: true })}
-            {field("tax_code", label("Codice fiscale", "Código fiscal"), { maxLength: 32, required: true })}
-          </div>
+          {field("vat_number", label("Partita IVA", "Número de IVA"), { maxLength: 32, required: true })}
           {field("pec", label("PEC (facoltativa)", "PEC (opcional)"), { type: "email", maxLength: 255 })}
           {field("sdi", label("Codice SDI (facoltativo)", "Código SDI (opcional)"), { pattern: "[A-Za-z0-9]{7}", maxLength: 7, title: label("Il codice SDI ha 7 caratteri (lettere e numeri).", "El código SDI tiene 7 caracteres (letras y números).") })}
         </>}
