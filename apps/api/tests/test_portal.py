@@ -197,3 +197,37 @@ def test_portal_vehicle_profile_holds_jobs_estimates_and_invoices(client):
     c.patch(f"/api/v1/invoices/{invoice['id']}/status", json={"status": "ISSUED"})
     invoices = portal.get(f"/api/v1/portal/vehicles/{vehicle['id']}").json()["invoices"]
     assert invoices[0]["invoice_number"] == invoice["invoice_number"] and invoices[0]["case_number"] == case["case_number"]
+
+
+
+def test_portal_service_requests_are_scoped_and_visible_to_staff(client):
+    c, _, _ = client
+    customer, _, vehicle, _ = fleet.create_fleet_case(c)
+    portal = portal_client(c, customer)
+    other = c.post("/api/v1/customers", json={"first_name": "Mario", "last_name": "Rossi"}).json()
+    stranger = portal_client(c, other)
+    vehicle_url = f"/api/v1/portal/vehicles/{vehicle['id']}/service-requests"
+    staff_url = f"/api/v1/customers/{customer['id']}/service-requests"
+
+    assert stranger.get(vehicle_url).status_code == 404
+    assert stranger.post(vehicle_url, json={"kind": "ONE_TRACK"}).status_code == 404
+    assert portal.post(vehicle_url, json={"kind": "MAINTENANCE", "note": "  "}).status_code == 422
+    maintenance = portal.post(vehicle_url, json={"kind": "MAINTENANCE", "note": "Tagliando"})
+    assert maintenance.status_code == 201, maintenance.text
+    request = maintenance.json()
+    gps = portal.post(vehicle_url, json={"kind": "ONE_TRACK"})
+    assert gps.status_code == 201, gps.text
+    gps_request = gps.json()
+    assert portal.post(vehicle_url, json={"kind": "ONE_TRACK"}).status_code == 409
+    assert portal.get(staff_url).status_code == 401
+    assert {entry["id"] for entry in c.get(staff_url).json()} == {request["id"], gps_request["id"]}
+    assert c.get(f"/api/v1/customers/{other['id']}/service-requests").json() == []
+    assert c.patch(f"/api/v1/customers/{other['id']}/service-requests/{request['id']}").status_code == 404
+
+    handled = c.patch(f"{staff_url}/{request['id']}")
+    assert handled.status_code == 200, handled.text
+    assert handled.json()["handled_at"] is not None
+    assert c.patch(f"{staff_url}/{request['id']}").json() == handled.json()
+    entries = {entry["id"]: entry for entry in portal.get(vehicle_url).json()}
+    assert entries[request["id"]]["handled_at"] == handled.json()["handled_at"]
+    assert entries[gps_request["id"]]["handled_at"] is None

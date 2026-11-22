@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
@@ -20,7 +21,7 @@ from app.models.billing import Invoice, InvoiceStatus
 from app.models.contracts import ServiceContract
 from app.models.estimating import Estimate, EstimateStatus
 from app.models.garage import Customer, RepairCase, Vehicle
-from app.models.portal import PortalAccount
+from app.models.portal import PortalAccount, PortalServiceRequest
 from app.models.tracking import CaseMessage
 from app.security.context import AuthContext, require_permission
 from app.security.passwords import hash_password, temporary_password, verify_password
@@ -728,3 +729,100 @@ def portal_update_profile(payload: PortalProfileUpdate, db: Session = Depends(ge
     db.refresh(account)
     db.refresh(customer)
     return portal_profile_dict(account, customer)
+
+
+
+class ServiceRequestCreate(BaseModel):
+    kind: Literal["MAINTENANCE", "ONE_TRACK"]
+    note: str = Field(default="", max_length=1000)
+
+
+def service_request_data(entry: PortalServiceRequest, plate: str) -> dict:
+    return {
+        "id": entry.id,
+        "license_plate": plate,
+        "kind": entry.kind,
+        "note": entry.note,
+        "created_at": entry.created_at,
+        "handled_at": entry.handled_at,
+    }
+
+
+def service_requests_query(tenant_id: UUID, customer_id: UUID):
+    return select(PortalServiceRequest, Vehicle.license_plate).join(
+        Vehicle, Vehicle.id == PortalServiceRequest.vehicle_id
+    ).where(
+        PortalServiceRequest.tenant_id == tenant_id,
+        PortalServiceRequest.customer_id == customer_id,
+        Vehicle.tenant_id == tenant_id,
+        Vehicle.customer_id == customer_id,
+    )
+
+
+@router.get("/portal/vehicles/{vehicle_id}/service-requests")
+def list_vehicle_service_requests(vehicle_id: UUID, db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+    vehicle = portal_vehicle(db, context, vehicle_id)
+    query = service_requests_query(context.tenant_id, context.customer_id).where(
+        PortalServiceRequest.vehicle_id == vehicle.id
+    ).order_by(PortalServiceRequest.created_at.desc())
+    return [service_request_data(entry, plate) for entry, plate in db.execute(query)]
+
+
+@router.post("/portal/vehicles/{vehicle_id}/service-requests", status_code=status.HTTP_201_CREATED)
+def create_vehicle_service_request(
+    vehicle_id: UUID, payload: ServiceRequestCreate, db: Session = Depends(get_db),
+    context: PortalContext = Depends(get_portal_context),
+):
+    vehicle = db.scalar(select(Vehicle).where(
+        Vehicle.id == vehicle_id,
+        Vehicle.tenant_id == context.tenant_id,
+        Vehicle.customer_id == context.customer_id,
+    ).with_for_update())
+    if vehicle is None:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    note = payload.note.strip()
+    if payload.kind == "MAINTENANCE" and not note:
+        raise HTTPException(status_code=422, detail="Descrivi la manutenzione richiesta.")
+    pending = db.scalar(select(PortalServiceRequest.id).where(
+        PortalServiceRequest.vehicle_id == vehicle.id,
+        PortalServiceRequest.tenant_id == context.tenant_id,
+        PortalServiceRequest.customer_id == context.customer_id,
+        PortalServiceRequest.kind == payload.kind,
+        PortalServiceRequest.handled_at.is_(None),
+    ))
+    if pending is not None:
+        raise HTTPException(status_code=409, detail="C’è già una richiesta di questo tipo in attesa.")
+    entry = PortalServiceRequest(
+        tenant_id=context.tenant_id, customer_id=context.customer_id, vehicle_id=vehicle.id,
+        kind=payload.kind, note=note,
+    )
+    db.add(entry)
+    db.commit()
+    return service_request_data(entry, vehicle.license_plate)
+
+
+@router.get("/customers/{customer_id}/service-requests")
+def list_customer_service_requests(customer_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("customer.read"))):
+    staff_customer(db, auth.tenant_id, customer_id)
+    query = service_requests_query(auth.tenant_id, customer_id).order_by(
+        PortalServiceRequest.handled_at.is_not(None), PortalServiceRequest.created_at.desc()
+    )
+    return [service_request_data(entry, plate) for entry, plate in db.execute(query)]
+
+
+@router.patch("/customers/{customer_id}/service-requests/{request_id}")
+def handle_service_request(
+    customer_id: UUID, request_id: UUID, db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_permission("customer.write")),
+):
+    query = service_requests_query(auth.tenant_id, customer_id).where(
+        PortalServiceRequest.id == request_id
+    ).with_for_update(of=PortalServiceRequest)
+    row = db.execute(query).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Service request not found")
+    entry, plate = row
+    if entry.handled_at is None:
+        entry.handled_at = datetime.now(timezone.utc)
+        db.commit()
+    return service_request_data(entry, plate)

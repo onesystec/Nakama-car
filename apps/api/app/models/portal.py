@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantOwnedMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -26,3 +26,15 @@ class PortalAccount(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin)
     legal_version: Mapped[str | None] = mapped_column(String(20))
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+
+class PortalServiceRequest(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
+    __tablename__ = "portal_service_requests"
+    __table_args__ = (Index("ix_portal_service_requests_customer_scope", "tenant_id", "customer_id"),)
+
+    customer_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("customers.id", ondelete="CASCADE"))
+    vehicle_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("vehicles.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str] = mapped_column(String(1000))
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

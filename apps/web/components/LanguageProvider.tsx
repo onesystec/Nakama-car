@@ -5,7 +5,8 @@ import { NavIcon } from "./NavIcon";
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { translate, Language } from "../lib/translations";
 
-const STORAGE_KEY = "nakama-language";
+// Start existing installations in Italian on this release, then remember explicit choices.
+const STORAGE_KEY = "nakama-language-v2";
 const LanguageContext = createContext({ language: "it" as Language, setLanguage: (_language: Language) => {}, t: (text: string | undefined) => text || "" });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
