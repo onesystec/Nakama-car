@@ -196,7 +196,7 @@ function Wizard({ initialType, busy, error, onMismatch, onSend }: FormProps & { 
             {field("tax_code", label("Codice fiscale", "Código fiscal"), { maxLength: 32, required: true })}
           </div>
           {field("pec", label("PEC (facoltativa)", "PEC (opcional)"), { type: "email", maxLength: 255 })}
-          {field("sdi", label("Codice SDI (facoltativo)", "Código SDI (opcional)"), { pattern: "[A-Za-z0-9]{7}", maxLength: 7 })}
+          {field("sdi", label("Codice SDI (facoltativo)", "Código SDI (opcional)"), { pattern: "[A-Za-z0-9]{7}", maxLength: 7, title: label("Il codice SDI ha 7 caratteri (lettere e numeri).", "El código SDI tiene 7 caracteres (letras y números).") })}
         </>}
         {step === "person" && <>
           <div className="registration-row">
@@ -213,7 +213,7 @@ function Wizard({ initialType, busy, error, onMismatch, onSend }: FormProps & { 
           <div className="registration-row three">
             {field("postal_code", label("CAP", "C.P."), { autoComplete: "postal-code", maxLength: 16, required: true })}
             {field("province", label("Prov.", "Prov."), { autoComplete: "address-level1", maxLength: 8, required: true })}
-            {field("country", label("Paese", "País"), { autoComplete: "country", pattern: "[A-Za-z]{2}", maxLength: 2, required: true })}
+            {field("country", label("Paese", "País"), { autoComplete: "country", pattern: "[A-Za-z]{2}", maxLength: 2, required: true, title: label("Due lettere, per esempio IT.", "Dos letras, por ejemplo IT.") })}
           </div>
         </>}
         {step === "password" && <>

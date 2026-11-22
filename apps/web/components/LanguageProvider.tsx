@@ -2,8 +2,9 @@
 
 import { NavIcon } from "./NavIcon";
 
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { translate, Language } from "../lib/translations";
+import { localizeValidation } from "../lib/validation";
 
 // Start existing installations in Italian on this release, then remember explicit choices.
 const STORAGE_KEY = "nakama-language-v2";
@@ -19,7 +20,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
   }, []);
-  useEffect(() => { document.documentElement.lang = language; }, [language]);
+  const current = useRef(language);
+  useEffect(() => { document.documentElement.lang = language; current.current = language; }, [language]);
+  // Form-validation bubbles speak the app language, not the browser's.
+  useEffect(() => localizeValidation(document, () => current.current), []);
   const setLanguage = useCallback((value: Language) => {
     updateLanguage(value);
     try { localStorage.setItem(STORAGE_KEY, value); } catch { /* The current page still switches language. */ }
