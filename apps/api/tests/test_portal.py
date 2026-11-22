@@ -273,3 +273,34 @@ def test_portal_invitation_and_suspension(client):
     assert c.patch(account_url, json={"active": True}).json()["suspension_reason"] is None
     assert public.get("/api/v1/portal/vehicles", headers=bearer).status_code == 401
     assert public.post(login_url, json=credentials).status_code == 200
+
+
+
+def test_invite_without_email_populates_existing_company(client):
+    c, _, _ = client
+    customer, _, _, _ = fleet.create_fleet_case(c)
+    path = f"/api/v1/customers/{customer['id']}"
+    issued = c.post(path + "/portal-invitations", json={})
+    assert issued.status_code == 201
+    public = c.__class__(c.app)
+    token = issued.json()["token"]
+    preview = public.post("/api/v1/portal/invitations/preview", json={"token": token})
+    assert preview.json() == {"email": None, "customer_type": "COMPANY", "customer_name": None}
+    profile = {
+        "first_name": "Fleet", "last_name": "Contact", "company_name": "Univex Group",
+        "vat_number": "IT12345678901", "tax_code": "12345678901", "phone": "0212345678",
+        "address": "Via Roma 1", "postal_code": "20100", "city": "Milano",
+        "province": "mi", "country": "it", "pec": "registered@example.com", "sdi": "abc1234",
+    }
+    data = {"token": token, "full_name": "Fleet Contact", "email": "fleet-intake@example.com",
+            "password": "example-long-password", "profile": profile}
+    endpoint = "/api/v1/portal/invitations/register"
+    assert public.post(endpoint, json={**data, "profile": None}).status_code == 422
+    response = public.post(endpoint, json=data)
+    assert response.status_code == 201, response.text
+    updated = c.get(path).json()
+    assert updated["id"] == customer["id"]
+    for key, value in {**profile, "email": data["email"], "vat_number": "12345678901",
+                       "country": "IT", "province": "MI", "sdi": "ABC1234"}.items():
+        assert updated[key] == value
+    assert public.post(endpoint, json=data).status_code == 404
