@@ -243,7 +243,8 @@ def create_invitation(customer_id: UUID, payload: InvitationCreate, response: Re
         db.add(account)
     token = secrets.token_urlsafe(32)
     account.invitation_digest = invitation_digest(token)
-    account.invitation_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    account.invitation_expires_at = expires_at
     try:
         db.flush()
         record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="portal_account",
@@ -253,15 +254,17 @@ def create_invitation(customer_id: UUID, payload: InvitationCreate, response: Re
         db.rollback()
         raise HTTPException(status_code=409, detail="Esiste già un accesso con questa email.") from error
     response.headers["Cache-Control"] = "no-store"
-    return {"token": token, "expires_at": account.invitation_expires_at}
+    return {"token": token, "expires_at": expires_at}
 
 
 def pending_invitation(db: Session, token: str, *, lock: bool = False) -> PortalAccount:
     query = select(PortalAccount).where(
-        PortalAccount.invitation_digest == invitation_digest(token), PortalAccount.active.is_(False),
+        PortalAccount.invitation_digest == invitation_digest(token),
+        PortalAccount.active.is_(False),
+        PortalAccount.invitation_expires_at > datetime.now(timezone.utc),
     )
     account = db.scalar(query.with_for_update() if lock else query)
-    if account is None or account.invitation_expires_at is None or account.invitation_expires_at <= datetime.now(timezone.utc):
+    if account is None:
         raise HTTPException(status_code=404, detail="INVITATION_INVALID")
     return account
 
