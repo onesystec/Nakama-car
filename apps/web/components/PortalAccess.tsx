@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { CustomerServiceRequests } from "./ServiceRequests";
 import { useLanguage } from "./LanguageProvider";
 import { apiError, apiFetch, hasPermission } from "../lib/api";
 
@@ -102,6 +103,7 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
           <div className="record-form-actions"><button className="primary">{t("Crea accesso")}</button></div>
         </form>
       )}
+      <CustomerServiceRequests key={customerId} customerId={customerId} canWrite={canWrite} />
     </div>
   );
 }
