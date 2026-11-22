@@ -76,7 +76,7 @@ function countdown(m: Maintenance, t: (text: string) => string) {
 }
 
 export default function PortalPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [me, setMe] = useState<Me | null>(null);
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [query, setQuery] = useState("");
@@ -282,7 +282,7 @@ export default function PortalPage() {
               <span className="plate-chip big">{selected.license_plate}</span>
               <div>
                 <h2>{[selected.make, selected.model].filter(Boolean).join(" ") || t("Veicolo")}</h2>
-                <small>{[selected.fleet_number && `${t("Flotta")} ${selected.fleet_number}`, selected.year, selected.fuel_type, km(selected.mileage)].filter(Boolean).join(" · ")}</small>
+                <small>{[selected.fleet_number && `${t("Flotta")} ${selected.fleet_number}`, selected.year, selected.fuel_type, selected.mileage == null ? `Km · ${language === "es" ? "Pendientes" : "Da inserire"}` : km(selected.mileage)].filter(Boolean).join(" · ")}</small>
               </div>
             </div>
 
