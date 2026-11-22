@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1 import workshop_scene
-from app.api.v1 import datev
+from app.api.v1 import datev, password_recovery
 
 from app.api.v1 import approvals, assistant, audit, staff, auth, billing, cases, company, contracts, customers, damages, dashboard, estimates, fleet, integrations, media, portal, renders, tracking, users, vehicles, workshop
 
@@ -8,6 +8,7 @@ api_router = APIRouter()
 api_router.include_router(workshop_scene.router)
 api_router.include_router(datev.router)
 api_router.include_router(auth.router)
+api_router.include_router(password_recovery.router)
 api_router.include_router(users.router)
 api_router.include_router(audit.router)
 api_router.include_router(dashboard.router)

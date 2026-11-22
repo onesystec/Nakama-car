@@ -11,7 +11,7 @@ import { PasswordStep } from "../../../components/PasswordStep";
 import { savePortalToken } from "../../../lib/portal";
 
 export default function PortalLoginPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -86,6 +86,7 @@ export default function PortalLoginPage() {
           <button className="primary auth-submit" disabled={loading}>{loading ? t("Accesso…") : t("Accedi")}</button>
         </form>}
         <p className="auth-foot">{t("Non hai le credenziali? Chiedile all'officina.")}</p>
+        <a href="/login/recover?area=portal">{language === "es" ? "¿Olvidaste la contraseña?" : "Password dimenticata?"}</a>
         <LegalLinks />
       </div>
     </main>

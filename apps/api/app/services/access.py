@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.identity import AccessLog
 
 # Bump when the terms, privacy or cookie texts change in a way users must accept again (lib/legal.ts too).
-LEGAL_VERSION = "2026-10-23"
+LEGAL_VERSION = "2026-11-22"
 RETENTION_DAYS = 365
 
 # Password guessing: after this many wrong passwords in the window, the account (or the address) waits.

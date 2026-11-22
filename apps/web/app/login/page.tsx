@@ -14,7 +14,7 @@ import { LegalLinks, LegalStep } from "../../components/Legal";
 import { PasswordStep } from "../../components/PasswordStep";
 
 export default function LoginPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -92,6 +92,7 @@ export default function LoginPage() {
         </form>}
         <p className="auth-foot"><a href="/portale/login">{t("Sei un cliente? Accedi al portale")}</a></p>
         <p className="auth-foot">{t("Primo avvio? Utilizza la pagina di inizializzazione riservata all'amministratore.")}</p>
+        <a href="/login/recover?area=staff">{language === "es" ? "¿Olvidaste la contraseña?" : "Password dimenticata?"}</a>
         <LegalLinks />
       </div>
     </main>
