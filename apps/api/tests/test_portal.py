@@ -231,3 +231,45 @@ def test_portal_service_requests_are_scoped_and_visible_to_staff(client):
     entries = {entry["id"]: entry for entry in portal.get(vehicle_url).json()}
     assert entries[request["id"]]["handled_at"] == handled.json()["handled_at"]
     assert entries[gps_request["id"]]["handled_at"] is None
+
+
+
+def test_portal_invitation_and_suspension(client):
+    c, _, _ = client
+    customer, _, _, _ = fleet.create_fleet_case(c)
+    other = c.post("/api/v1/customers", json={"first_name": "Another", "last_name": "Customer"}).json()
+    email = "invited@example.com"
+    path = f"/api/v1/customers/{customer['id']}/portal-invitations"
+    first = c.post(path, json={"email": email})
+    assert first.status_code == 201
+    assert c.post(f"/api/v1/customers/{other['id']}/portal-invitations", json={"email": email}).status_code == 409
+    second = c.post(path, json={"email": email})
+    assert second.status_code == 201
+    token = second.json()["token"]
+    assert token != first.json()["token"]
+    public = c.__class__(c.app)
+    register = "/api/v1/portal/invitations/register"
+    data = {"token": token, "full_name": "Fleet contact", "password": "example-long-password"}
+    assert public.post(register, json={**data, "token": first.json()["token"]}).status_code == 404
+    assert public.post("/api/v1/portal/invitations/preview", json={"token": token}).json()["email"] == email
+    accounts_url = f"/api/v1/customers/{customer['id']}/portal-accounts"
+    account = c.get(accounts_url).json()[0]
+    account_url = f"/api/v1/portal-accounts/{account['id']}"
+    assert c.patch(account_url, json={"active": True}).status_code == 409
+    assert "invitation_digest" not in account
+    assert public.post(register, json=data).status_code == 201
+    assert public.post(register, json=data).status_code == 404
+    login_url = "/api/v1/portal/auth/login"
+    credentials = {"email": email, "password": data["password"]}
+    session = public.post(login_url, json=credentials)
+    assert session.status_code == 200
+    bearer = {"Authorization": "Bearer " + session.json()["access_token"]}
+    assert public.post("/api/v1/portal/legal", headers=bearer, json={"accept_terms": True, "accept_privacy": True}).status_code == 200
+    assert public.get("/api/v1/portal/vehicles", headers=bearer).status_code == 200
+    suspended = c.patch(account_url, json={"active": False, "suspension_reason": "Pagamento in sospeso"})
+    assert suspended.status_code == 200 and suspended.json()["suspension_reason"] == "Pagamento in sospeso"
+    assert public.get("/api/v1/portal/vehicles", headers=bearer).status_code == 401
+    assert public.post(login_url, json=credentials).status_code == 401
+    assert c.patch(account_url, json={"active": True}).json()["suspension_reason"] is None
+    assert public.get("/api/v1/portal/vehicles", headers=bearer).status_code == 401
+    assert public.post(login_url, json=credentials).status_code == 200

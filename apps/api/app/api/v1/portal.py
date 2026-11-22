@@ -1,5 +1,7 @@
 """Fleet customer portal: the workshop creates logins, the customer follows its vehicles."""
+import hashlib
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
@@ -11,6 +13,7 @@ from fastapi.responses import Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.billing import invoice_context, invoice_lines, tenant_settings
@@ -48,7 +51,21 @@ class PortalAccountCreate(BaseModel):
 
 class PortalAccountUpdate(BaseModel):
     active: bool | None = None
+    suspension_reason: str | None = Field(default=None, max_length=240)
     full_name: str | None = Field(default=None, min_length=2, max_length=160)
+
+
+class InvitationCreate(BaseModel):
+    email: EmailStr
+
+
+class InvitationToken(BaseModel):
+    token: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+
+
+class InvitationRegistration(InvitationToken):
+    full_name: str = Field(min_length=2, max_length=160)
+    password: str = Field(min_length=10, max_length=200)
 
 
 class MaintenanceUpdate(BaseModel):
@@ -118,6 +135,8 @@ def account_dict(account: PortalAccount) -> dict:
         "must_change_password": account.must_change_password,
         "last_login_at": account.last_login_at,
         "created_at": account.created_at,
+        "invitation_expires_at": account.invitation_expires_at,
+        "suspension_reason": account.suspension_reason,
     }
 
 
@@ -129,7 +148,7 @@ def staff_customer(db: Session, tenant_id: UUID, customer_id: UUID) -> Customer:
 
 
 def staff_account(db: Session, tenant_id: UUID, account_id: UUID) -> PortalAccount:
-    account = db.scalar(select(PortalAccount).where(PortalAccount.id == account_id, PortalAccount.tenant_id == tenant_id))
+    account = db.scalar(select(PortalAccount).where(PortalAccount.id == account_id, PortalAccount.tenant_id == tenant_id).with_for_update())
     if account is None:
         raise HTTPException(status_code=404, detail="Portal account not found")
     return account
@@ -203,14 +222,97 @@ def create_portal_account(customer_id: UUID, payload: PortalAccountCreate, db: S
     return {**account_dict(account), "temporary_password": password}
 
 
+def invitation_digest(token: str) -> str:
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+
+@router.post("/customers/{customer_id}/portal-invitations", status_code=201)
+def create_invitation(customer_id: UUID, payload: InvitationCreate, response: Response,
+                      db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("customer.write"))):
+    staff_customer(db, auth.tenant_id, customer_id)
+    email = payload.email.lower()
+    account = db.scalar(select(PortalAccount).where(PortalAccount.email == email).with_for_update())
+    if account is not None and (
+        account.tenant_id != auth.tenant_id or account.customer_id != customer_id or account.invitation_digest is None
+    ):
+        raise HTTPException(status_code=409, detail="Esiste già un accesso con questa email.")
+    if account is None:
+        account = PortalAccount(tenant_id=auth.tenant_id, customer_id=customer_id, email=email,
+                                full_name="Invito al portale", password_hash=hash_password(secrets.token_urlsafe(32)),
+                                active=False, must_change_password=False)
+        db.add(account)
+    token = secrets.token_urlsafe(32)
+    account.invitation_digest = invitation_digest(token)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    account.invitation_expires_at = expires_at
+    try:
+        db.flush()
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="portal_account",
+                     entity_id=account.id, action="invited")
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Esiste già un accesso con questa email.") from error
+    response.headers["Cache-Control"] = "no-store"
+    return {"token": token, "expires_at": expires_at}
+
+
+def pending_invitation(db: Session, token: str, *, lock: bool = False) -> PortalAccount:
+    query = select(PortalAccount).where(
+        PortalAccount.invitation_digest == invitation_digest(token),
+        PortalAccount.active.is_(False),
+        PortalAccount.invitation_expires_at > datetime.now(timezone.utc),
+    )
+    account = db.scalar(query.with_for_update() if lock else query)
+    if account is None:
+        raise HTTPException(status_code=404, detail="INVITATION_INVALID")
+    return account
+
+
+@router.post("/portal/invitations/preview")
+def preview_invitation(payload: InvitationToken, response: Response, db: Session = Depends(get_db)):
+    account = pending_invitation(db, payload.token)
+    customer = staff_customer(db, account.tenant_id, account.customer_id)
+    response.headers["Cache-Control"] = "no-store"
+    return {"email": account.email, "customer_name": customer.company_name or
+            " ".join(value for value in (customer.first_name, customer.last_name) if value)}
+
+
+@router.post("/portal/invitations/register", status_code=201)
+def register_invitation(payload: InvitationRegistration, request: Request, db: Session = Depends(get_db)):
+    account = pending_invitation(db, payload.token, lock=True)
+    full_name = payload.full_name.strip()
+    if len(full_name) < 2:
+        raise HTTPException(status_code=422, detail="INVALID_NAME")
+    account.full_name = full_name
+    account.password_hash = hash_password(payload.password)
+    account.active = True
+    account.auth_version += 1
+    account.invitation_digest = None
+    account.invitation_expires_at = None
+    access.record_access(db, request, tenant_id=account.tenant_id, portal_account_id=account.id,
+                         email=account.email, event="INVITATION_ACCEPTED")
+    db.commit()
+    return {"registered": True}
+
+
 @router.patch("/portal-accounts/{account_id}")
 def update_portal_account(account_id: UUID, payload: PortalAccountUpdate, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("customer.write"))):
     account = staff_account(db, auth.tenant_id, account_id)
     if payload.full_name is not None:
         account.full_name = payload.full_name.strip()
     if payload.active is not None and payload.active != account.active:
+        if "users.manage" not in auth.permissions:
+            raise HTTPException(status_code=403, detail="Permission denied")
+        if account.invitation_digest is not None:
+            raise HTTPException(status_code=409, detail="Invito non ancora accettato.")
         account.active = payload.active
         account.auth_version += 1
+        reason = (payload.suspension_reason or "").strip()
+        account.suspension_reason = None if account.active else (reason or None)
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="portal_account",
+                     entity_id=account.id, action="reactivated" if account.active else "suspended",
+                     new_value={"active": account.active, "reason": account.suspension_reason})
     db.commit()
     db.refresh(account)
     return account_dict(account)
@@ -219,6 +321,8 @@ def update_portal_account(account_id: UUID, payload: PortalAccountUpdate, db: Se
 @router.post("/portal-accounts/{account_id}/reset-password")
 def reset_portal_password(account_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("customer.write"))):
     account = staff_account(db, auth.tenant_id, account_id)
+    if account.invitation_digest is not None:
+        raise HTTPException(status_code=409, detail="Invito non ancora accettato.")
     password = temporary_password()
     account.password_hash = hash_password(password)
     account.must_change_password = True
