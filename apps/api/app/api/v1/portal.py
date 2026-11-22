@@ -23,7 +23,7 @@ from app.models.approval import EstimateApproval
 from app.models.billing import Invoice, InvoiceStatus
 from app.models.contracts import ServiceContract
 from app.models.estimating import Estimate, EstimateStatus
-from app.models.garage import Customer, RepairCase, Vehicle
+from app.models.garage import Customer, CustomerType, RepairCase, Vehicle
 from app.models.portal import PortalAccount, PortalServiceRequest
 from app.models.tracking import CaseMessage
 from app.security.context import AuthContext, require_permission
@@ -40,6 +40,7 @@ router = APIRouter(tags=["portal"])
 settings = get_settings()
 bearer = HTTPBearer(auto_error=False)
 PORTAL_TOKEN_HOURS = 12
+UNASSIGNED_INVITATION_DOMAIN = "@portal-invite.invalid"
 
 
 # ---------- schemas ----------
@@ -56,14 +57,32 @@ class PortalAccountUpdate(BaseModel):
 
 
 class InvitationCreate(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
 
 
 class InvitationToken(BaseModel):
     token: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
 
 
+class InvitationProfile(BaseModel):
+    first_name: str = Field(min_length=1, max_length=120)
+    last_name: str = Field(min_length=1, max_length=120)
+    company_name: str | None = Field(default=None, max_length=180)
+    vat_number: str | None = Field(default=None, max_length=32)
+    tax_code: str = Field(min_length=1, max_length=32)
+    phone: str = Field(min_length=1, max_length=32)
+    address: str = Field(min_length=1, max_length=255)
+    city: str = Field(min_length=1, max_length=120)
+    postal_code: str = Field(min_length=1, max_length=16)
+    province: str = Field(min_length=1, max_length=8)
+    country: str = Field(pattern=r"^[A-Za-z]{2}$")
+    pec: EmailStr | None = None
+    sdi: str | None = Field(default=None, max_length=7)
+
+
 class InvitationRegistration(InvitationToken):
+    email: EmailStr | None = None
+    profile: InvitationProfile | None = None
     full_name: str = Field(min_length=2, max_length=160)
     password: str = Field(min_length=10, max_length=200)
 
@@ -129,7 +148,7 @@ def account_dict(account: PortalAccount) -> dict:
     return {
         "id": str(account.id),
         "customer_id": str(account.customer_id),
-        "email": account.email,
+        "email": None if account.email.endswith(UNASSIGNED_INVITATION_DOMAIN) else account.email,
         "full_name": account.full_name,
         "active": account.active,
         "must_change_password": account.must_change_password,
@@ -229,9 +248,21 @@ def invitation_digest(token: str) -> str:
 @router.post("/customers/{customer_id}/portal-invitations", status_code=201)
 def create_invitation(customer_id: UUID, payload: InvitationCreate, response: Response,
                       db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("customer.write"))):
-    staff_customer(db, auth.tenant_id, customer_id)
-    email = payload.email.lower()
-    account = db.scalar(select(PortalAccount).where(PortalAccount.email == email).with_for_update())
+    customer = db.scalar(select(Customer).where(
+        Customer.id == customer_id, Customer.tenant_id == auth.tenant_id,
+    ).with_for_update())
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    if payload.email is None:
+        account = db.scalar(select(PortalAccount).where(
+            PortalAccount.customer_id == customer_id, PortalAccount.tenant_id == auth.tenant_id,
+            PortalAccount.invitation_digest.is_not(None),
+            PortalAccount.email.endswith(UNASSIGNED_INVITATION_DOMAIN),
+        ).order_by(PortalAccount.created_at).limit(1).with_for_update())
+        email = account.email if account else f"{secrets.token_hex(16)}{UNASSIGNED_INVITATION_DOMAIN}"
+    else:
+        email = payload.email.lower()
+        account = db.scalar(select(PortalAccount).where(PortalAccount.email == email).with_for_update())
     if account is not None and (
         account.tenant_id != auth.tenant_id or account.customer_id != customer_id or account.invitation_digest is None
     ):
@@ -274,16 +305,61 @@ def preview_invitation(payload: InvitationToken, response: Response, db: Session
     account = pending_invitation(db, payload.token)
     customer = staff_customer(db, account.tenant_id, account.customer_id)
     response.headers["Cache-Control"] = "no-store"
-    return {"email": account.email, "customer_name": customer.company_name or
-            " ".join(value for value in (customer.first_name, customer.last_name) if value)}
+    unassigned = account.email.endswith(UNASSIGNED_INVITATION_DOMAIN)
+    return {
+        "email": None if unassigned else account.email,
+        "customer_type": customer.customer_type.value,
+        "customer_name": None if unassigned else customer.company_name or
+            " ".join(value for value in (customer.first_name, customer.last_name) if value),
+    }
 
 
 @router.post("/portal/invitations/register", status_code=201)
 def register_invitation(payload: InvitationRegistration, request: Request, db: Session = Depends(get_db)):
+    pending = pending_invitation(db, payload.token)
+    customer = db.scalar(select(Customer).where(
+        Customer.id == pending.customer_id, Customer.tenant_id == pending.tenant_id,
+    ).with_for_update())
+    if customer is None:
+        raise HTTPException(status_code=404, detail="INVITATION_INVALID")
     account = pending_invitation(db, payload.token, lock=True)
     full_name = payload.full_name.strip()
     if len(full_name) < 2:
         raise HTTPException(status_code=422, detail="INVALID_NAME")
+    if account.email.endswith(UNASSIGNED_INVITATION_DOMAIN):
+        if payload.email is None or payload.profile is None:
+            raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
+        account.email = payload.email.lower()
+        profile = {key: value.strip() for key, value in payload.profile.model_dump(exclude_none=True).items()}
+        required = ("first_name", "last_name", "tax_code", "phone", "address", "city", "postal_code", "province", "country")
+        if customer.customer_type == CustomerType.COMPANY:
+            required += ("company_name", "vat_number")
+        if any(not profile.get(field) for field in required):
+            raise HTTPException(status_code=422, detail="PROFILE_REQUIRED")
+        profile["country"] = profile["country"].upper()
+        profile["tax_code"] = profile["tax_code"].upper()
+        profile["province"] = profile["province"].upper()
+        if customer.customer_type == CustomerType.COMPANY:
+            vat = profile["vat_number"].upper().replace(" ", "")
+            if profile["country"] == "IT":
+                vat = vat.removeprefix("IT")
+                if not re.fullmatch(r"[0-9]{11}", vat):
+                    raise HTTPException(status_code=422, detail="VAT_INVALID")
+            profile["vat_number"] = vat
+            if profile.get("sdi"):
+                profile["sdi"] = profile["sdi"].upper()
+                if not re.fullmatch(r"[A-Z0-9]{7}", profile["sdi"]):
+                    raise HTTPException(status_code=422, detail="SDI_INVALID")
+        else:
+            for field in ("company_name", "vat_number", "pec", "sdi"):
+                profile.pop(field, None)
+        for field, value in profile.items():
+            if value:
+                setattr(customer, field, value)
+        customer.email = account.email
+        record_audit(db, tenant_id=account.tenant_id, user_id=None, entity_type="customer",
+                     entity_id=customer.id, action="profile_registered",
+                     new_value={"changed_fields": sorted([*profile, "email"])})
     account.full_name = full_name
     account.password_hash = hash_password(payload.password)
     account.active = True
@@ -292,7 +368,11 @@ def register_invitation(payload: InvitationRegistration, request: Request, db: S
     account.invitation_expires_at = None
     access.record_access(db, request, tenant_id=account.tenant_id, portal_account_id=account.id,
                          email=account.email, event="INVITATION_ACCEPTED")
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="EMAIL_IN_USE") from error
     return {"registered": True}
 
 
