@@ -11,6 +11,7 @@ import { DamageMarker, DamagePhotoMap, MapPhoto, MarkerView } from "../../compon
 import { loadCustomerPhotos, OtherPhotos } from "../../components/CustomerPhotos";
 import type { PlateSpots } from "../../lib/plateSpots";
 import { FleetProfile, Job, JobItem } from "../../components/FleetProfile";
+import { VehicleServiceRequests } from "../../components/ServiceRequests";
 import { CustomerLogo } from "../../components/CustomerLogo";
 import { openInvoicePdf, PortalAddVehicle, PortalChat, PortalEstimates, PortalInvoices, PortalProfile, PortalSection, PortalSidebar } from "../../components/PortalSections";
 import { clearPortalToken, getPortalToken, portalError, portalFetch, savePortalToken } from "../../lib/portal";
@@ -208,6 +209,7 @@ export default function PortalPage() {
       {vehicle.current_case ? (
         <span className={`portal-in-shop${vehicle.current_case.status === "READY" ? " ready" : ""}`}>{vehicle.current_case.status === "READY" ? "✅" : "🔧"} {t(vehicle.current_case.status_text)}{vehicle.current_case.tasks_total ? ` · ${vehicle.current_case.tasks_done}/${vehicle.current_case.tasks_total}` : ""}</span>
       ) : <span className="portal-free">{t("Non in officina")}</span>}
+      {vehicle.mileage != null && <small>{t("Chilometraggio")} · {km(vehicle.mileage)}</small>}
       <TelemetryBadge reading={vehicle.telemetry} />
       <span className="portal-maintenance">{t(stateLabel[vehicle.maintenance.state])}{countdown(vehicle.maintenance, t) ? ` · ${countdown(vehicle.maintenance, t)}` : ""}</span>
     </button>
@@ -284,7 +286,11 @@ export default function PortalPage() {
               </div>
             </div>
 
+            {!selected.current_case && ["DELIVERED", "INVOICED"].includes(selected.history[0]?.status) && (
+              <p className="portal-free">{t("Veicolo consegnato")}</p>
+            )}
             <TelemetryCard reading={selected.telemetry} />
+            <VehicleServiceRequests key={selected.id} vehicleId={selected.id} />
 
             <div className={`maintenance-card ${selected.maintenance.state.toLowerCase()}`}>
               <div>
