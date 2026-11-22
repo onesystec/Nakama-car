@@ -61,3 +61,32 @@ def test_portal_login_is_logged_and_needs_both_boxes(client):
     portal_rows = [row for row in logs if row["account_type"] == "PORTAL"]
     assert [row["event"] for row in portal_rows] == ["LOGIN_OK", "LEGAL_ACCEPTED", "LOGIN_OK", "LOGIN_FAILED"]
     assert portal_rows[2]["client"] == "MAC"
+
+
+
+def test_recovery_is_generic_and_revokes_previous_session(client, monkeypatch):
+    from app.api.v1 import password_recovery
+
+    c, _, _ = client
+    sent = []
+    monkeypatch.setenv("NAKAMA_RECOVERY_RESEND_API_KEY", "mock-key")
+    monkeypatch.setattr(password_recovery, "send_recovery_message", lambda *args: sent.append(args))
+    assert c.post("/api/v1/users", json=payload()).status_code == 201
+    worker = c.__class__(c.app)
+    original = {"email": "worker@example.com", "password": payload()["password"]}
+    login = worker.post("/api/v1/auth/login", json=original).json()
+    worker.headers["Authorization"] = "Bearer " + login["access_token"]
+
+    path = "/api/v1/auth/recovery"
+    missing = worker.post(path + "/request", json={"email": "nobody@example.com", "account_type": "staff"})
+    issued = worker.post(path + "/request", json={"email": original["email"], "account_type": "staff"})
+    assert missing.status_code == issued.status_code == 202
+    assert missing.json() == issued.json()
+    assert len(sent) == 1 and sent[0][1] == original["email"]
+    token = sent[0][2]
+    reset = {"token": token, "password": "different-long-password"}
+    assert worker.post(path + "/confirm", json=reset).status_code == 200
+    assert worker.post(path + "/confirm", json=reset).status_code == 400
+    assert worker.post("/api/v1/auth/legal", json={"accept_terms": True, "accept_privacy": True}).status_code == 401
+    assert worker.post("/api/v1/auth/login", json=original).status_code == 401
+    assert worker.post("/api/v1/auth/login", json={**original, "password": reset["password"]}).status_code == 200
