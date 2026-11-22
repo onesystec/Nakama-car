@@ -5,7 +5,7 @@ import { CustomerServiceRequests } from "./ServiceRequests";
 import { useLanguage } from "./LanguageProvider";
 import { apiError, apiFetch, hasPermission } from "../lib/api";
 
-type Account = { id: string; email: string; full_name: string; active: boolean; must_change_password: boolean; last_login_at?: string | null; temporary_password?: string; invitation_expires_at?: string | null; suspension_reason?: string | null };
+type Account = { id: string; email: string | null; full_name: string; active: boolean; must_change_password: boolean; last_login_at?: string | null; temporary_password?: string; invitation_expires_at?: string | null; suspension_reason?: string | null };
 
 /** Customer portal logins: the workshop creates them and hands the temporary password to the customer. */
 export function PortalAccess({ customerId, customerName }: { customerId: string; customerName: string }) {
@@ -14,7 +14,6 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [draft, setDraft] = useState({ email: "", full_name: "" });
   const [issued, setIssued] = useState<Account | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
   const [invitation, setInvitation] = useState<{ url: string; expires_at: string } | null>(null);
   const [suspension, setSuspension] = useState<Account | null>(null);
   const [reason, setReason] = useState("");
@@ -33,7 +32,6 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
     setIsAdmin(hasPermission("users.manage"));
     setIssued(null);
     setInvitation(null);
-    setInviteEmail("");
     setSuspension(null);
     setMessage("");
     load();
@@ -86,7 +84,7 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
     setMessage("");
     try {
       const response = await apiFetch(`/customers/${customerId}/portal-invitations`, {
-        method: "POST", body: JSON.stringify({ email: inviteEmail }),
+        method: "POST", body: JSON.stringify({}),
       });
       if (!response.ok) {
         setMessage(await apiError(response, label("Impossibile generare il link.", "No se pudo generar el enlace.")));
@@ -154,12 +152,30 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
           </li>
         ))}
       </ul>
+      {canWrite && <form className="record-form portal-account-form" onSubmit={invite}>
+        <h4>{label("Invita al portale", "Invitar al portal")}</h4>
+        <p className="hint">{label("Invia il link al cliente. Sarà lui a inserire i dati e creare l’accesso.", "Envía el enlace al cliente. Él completará los datos y creará su acceso.")}</p>
+        <div className="record-form-actions"><button className="primary" disabled={busy}>{label("Genera link", "Generar enlace")}</button></div>
+        {invitation && <div className="issued-password">
+          <label>{label("Link di registrazione", "Enlace de registro")}
+            <input readOnly value={invitation.url} onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <p className="hint">{label("Valido una sola volta fino al", "Válido una sola vez hasta el")} {new Date(invitation.expires_at).toLocaleString(language === "es" ? "es-ES" : "it-IT")}</p>
+          <button type="button" className="secondary" onClick={async () => {
+            try { await navigator.clipboard.writeText(invitation.url); setMessage(label("Link copiato.", "Enlace copiado.")); }
+            catch { setMessage(label("Seleziona e copia il link dal campo.", "Selecciona y copia el enlace del campo.")); }
+          }}>{label("Copia link", "Copiar enlace")}</button>
+        </div>}
+      </form>}
       {canWrite && (
+        <details>
+        <summary>{label("Creazione manuale dell’accesso", "Crear acceso manualmente")}</summary>
         <form className="record-form portal-account-form" onSubmit={createAccount}>
           <label>{t("Nome referente")}<input required minLength={2} maxLength={160} value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} placeholder={t("Es. Ufficio flotta")} /></label>
           <label>{t("Email")}<input required type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
           <div className="record-form-actions"><button className="primary">{t("Crea accesso")}</button></div>
         </form>
+        </details>
       )}
       {suspension && (
         <form className="record-form portal-account-form" onSubmit={(event) => { event.preventDefault(); void toggle(suspension); }}>
@@ -176,23 +192,6 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
           <button type="button" className="secondary" disabled={busy} onClick={() => setSuspension(null)}>{t("Annulla")}</button>
         </form>
       )}
-      {canWrite && <form className="record-form portal-account-form" onSubmit={invite}>
-        <h4>{label("Invita al portale", "Invitar al portal")}</h4>
-        <label>{label("Email del referente", "Correo del responsable")}
-          <input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
-        </label>
-        <div className="record-form-actions"><button className="primary" disabled={busy}>{label("Genera link", "Generar enlace")}</button></div>
-        {invitation && <div className="issued-password">
-          <label>{label("Link di registrazione", "Enlace de registro")}
-            <input readOnly value={invitation.url} onFocus={(event) => event.currentTarget.select()} />
-          </label>
-          <p className="hint">{label("Valido una sola volta fino al", "Válido una sola vez hasta el")} {new Date(invitation.expires_at).toLocaleString(language === "es" ? "es-ES" : "it-IT")}</p>
-          <button type="button" className="secondary" onClick={async () => {
-            try { await navigator.clipboard.writeText(invitation.url); setMessage(label("Link copiato.", "Enlace copiado.")); }
-            catch { setMessage(label("Seleziona e copia il link dal campo.", "Selecciona y copia el enlace del campo.")); }
-          }}>{label("Copia link", "Copiar enlace")}</button>
-        </div>}
-      </form>}
       <CustomerServiceRequests key={customerId} customerId={customerId} canWrite={canWrite} />
     </div>
   );
