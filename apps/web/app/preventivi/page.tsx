@@ -6,6 +6,7 @@ import { useLanguage } from "../../components/LanguageProvider";
 import { apiError, apiFetch, estimateTone, formatMoney, getAccessToken, hasPermission, hidesEstimates, homeFor, openProtectedFile, sessionUser } from "../../lib/api";
 import { whatsappNumber } from "../../components/CaseTracking";
 import { EstimateChip } from "../../components/EstimateChip";
+import { missingPriceFields, money, priceLine } from "../../lib/estimatePricing";
 
 type Estimate = {
   id: string;
@@ -61,6 +62,11 @@ function blankLine(rates: Record<string, string>): Line {
     labor_hours: "0", labor_rate: rates.MECHANICAL || "50", paint_hours: "0", paint_rate: rates.PAINT || "48",
     materials: "0", vat_rate: "22",
   };
+}
+
+/** What a line looked like when last saved, to tell which rows have unsaved edits. */
+function lineSignature(line: Line) {
+  return JSON.stringify([line.category, line.description.trim(), ...numericFields.map((field) => Number(line[field] || 0))]);
 }
 
 function linePayload(line: Line) {
@@ -224,6 +230,7 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [canEditPrices, setCanEditPrices] = useState(false);
+  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
 
   async function reload() {
     const [estimateResponse, linesResponse] = await Promise.all([apiFetch(`/estimates/${id}`), apiFetch(`/estimates/${id}/lines`)]);
@@ -233,7 +240,9 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
     }
     setEstimate(await estimateResponse.json());
     const data: Line[] = await linesResponse.json();
-    setLines(data.map((line) => Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value === null ? "" : String(value)])) as unknown as Line));
+    const loaded = data.map((line) => Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value === null ? "" : String(value)])) as unknown as Line);
+    setLines(loaded);
+    setSavedSignatures(Object.fromEntries(loaded.map((line) => [line.id, lineSignature(line)])));
   }
 
   useEffect(() => {
@@ -248,6 +257,18 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
 
   const locked = !estimate || estimate.status === "APPROVED";
 
+  // Totals follow every keystroke: each line is priced here with the same rules as the server.
+  const priced = lines.map((line) => ({
+    amounts: priceLine(line, estimate),
+    missing: new Set(missingPriceFields(line, estimate)),
+    dirty: !line.id || savedSignatures[line.id] !== lineSignature(line),
+  }));
+  const liveSubtotal = money(priced.reduce((sum, row) => sum + row.amounts.subtotal, 0));
+  const liveVat = money(priced.reduce((sum, row) => sum + row.amounts.vat, 0));
+  const liveTotal = money(liveSubtotal + liveVat);
+  const unpricedCount = priced.filter((row) => row.missing.size > 0).length;
+  const dirtyCount = locked ? 0 : priced.filter((row) => row.dirty).length;
+
   function update(index: number, patch: Partial<Line>) {
     setLines((previous) => previous.map((line, position) => {
       if (position !== index) return line;
@@ -259,11 +280,11 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
     }));
   }
 
-  async function saveLine(index: number) {
+  async function saveLine(index: number, refresh = true): Promise<boolean> {
     const line = lines[index];
     if (!line.description.trim()) {
       setError(t("Inserisci la descrizione della riga."));
-      return;
+      return false;
     }
     setSavingId(line.id || `new-${index}`);
     setError("");
@@ -273,10 +294,26 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
     setSavingId(null);
     if (!response.ok) {
       setError(t(response.status === 403 ? "Il tuo profilo non consente questa operazione." : await apiError(response, "Impossibile salvare la riga.")));
-      return;
+      return false;
+    }
+    if (refresh) {
+      await reload();
+      onChanged();
+    }
+    return true;
+  }
+
+  async function saveAll() {
+    let ok = true;
+    for (let index = 0; index < lines.length; index += 1) {
+      if (priced[index].dirty && !(await saveLine(index, false))) {
+        ok = false;
+        break;
+      }
     }
     await reload();
     onChanged();
+    if (ok) setError("");
   }
 
   async function removeLine(index: number) {
@@ -311,9 +348,18 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
       <div className="panel-head">
         <div>
           <h2>{estimate?.estimate_number || t("Caricamento…")}</h2>
-          {estimate && <p><EstimateChip status={estimate.status} /> {t("Totale")} {formatMoney(estimate.total)} ({t("imponibile")} {formatMoney(estimate.subtotal)} + {t("IVA")} {formatMoney(estimate.vat_total)})</p>}
+          {estimate && <p><EstimateChip status={estimate.status} /> {t("Totale")} <strong>{formatMoney(liveTotal)}</strong> ({t("imponibile")} {formatMoney(liveSubtotal)} + {t("IVA")} {formatMoney(liveVat)})</p>}
+          {estimate && (unpricedCount > 0 || dirtyCount > 0) && (
+            <p className="estimate-flags">
+              {unpricedCount > 0 && <span className="flag-missing">{unpricedCount === 1 ? t("1 riga senza prezzo") : t("{n} righe senza prezzo").replace("{n}", String(unpricedCount))}</span>}
+              {dirtyCount > 0 && <span className="flag-dirty">{dirtyCount === 1 ? t("1 riga con modifiche non salvate") : t("{n} righe con modifiche non salvate").replace("{n}", String(dirtyCount))}</span>}
+            </p>
+          )}
         </div>
-        <button className="secondary" onClick={onClose}>{t("Chiudi")}</button>
+        <div className="panel-actions">
+          {dirtyCount > 0 && <button className="primary" onClick={saveAll} disabled={savingId !== null}>{savingId !== null ? "…" : t("Salva tutto")}</button>}
+          <button className="secondary" onClick={onClose}>{t("Chiudi")}</button>
+        </div>
       </div>
       {error && <div className="record-error" role="alert">{error}</div>}
       {estimate && (
@@ -340,23 +386,24 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
         </div>
         {lines.length === 0 && <div className="empty-state">{t("Nessuna riga. Aggiungi ricambi e manodopera.")}</div>}
         {lines.map((line, index) => (
-          <div className="line-row" role="row" key={line.id || `new-${index}`}>
+          <div className={`line-row${priced[index].missing.size ? " unpriced" : ""}${priced[index].dirty && !locked ? " dirty" : ""}`} role="row" key={line.id || `new-${index}`}>
             <select aria-label={t("Tipo")} disabled={locked} value={line.category} onChange={(e) => update(index, { category: e.target.value })}>
               {categories.map((code) => <option key={code} value={code}>{t(code)}</option>)}
             </select>
             <input aria-label={t("Descrizione")} disabled={locked} value={line.description} maxLength={255} onChange={(e) => update(index, { description: e.target.value })} />
             {(["quantity", "unit_price", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "materials", "vat_rate"] as (keyof Line)[]).map((field) => (
-              <label key={field} className="line-field">
+              <label key={field} className={`line-field${priced[index].missing.has(field as never) ? " missing" : ""}`}>
                 <small>{t(fieldLabels[field] || String(field))}</small>
                 <input aria-label={t(fieldLabels[field] || String(field))} type="number" inputMode="decimal" min="0" step="0.01" disabled={locked} value={line[field] || ""} onChange={(e) => update(index, { [field]: e.target.value } as Partial<Line>)} />
               </label>
             ))}
             <span className="line-total">
-              {line.line_total ? formatMoney(line.line_total) : "—"}
-              {line.id && estimate?.labor_included && Number(line.labor_hours) > 0 && <small>{t("manodopera inclusa")}</small>}
+              {formatMoney(priced[index].amounts.total)}
+              {priced[index].missing.size > 0 && <small className="missing-note">{t("senza prezzo")}</small>}
+              {estimate?.labor_included && Number(line.labor_hours) > 0 && <small>{t("manodopera inclusa")}</small>}
             </span>
             <span className="table-actions">
-              {!locked && <button onClick={() => saveLine(index)} disabled={savingId !== null}>{savingId === (line.id || `new-${index}`) ? "…" : t("Salva")}</button>}
+              {!locked && <button className={priced[index].dirty ? "needs-save" : ""} onClick={() => saveLine(index)} disabled={savingId !== null}>{savingId === (line.id || `new-${index}`) ? "…" : t("Salva")}</button>}
               {!locked && <button onClick={() => removeLine(index)} aria-label={t("Elimina riga")}>✕</button>}
             </span>
           </div>

@@ -998,6 +998,24 @@ html[data-theme="dark"], html[data-theme="dark"] body { background: #0b1725; col
 .line-row.invoice > :last-child { text-align: right; }
 .line-row.totals-row { background: #f8f9fa; }
 .add-line { margin-top: 12px; }
+/* Live totals: rows still without a price in red, unsaved rows marked on the left. */
+.estimate-editor .panel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.estimate-editor .estimate-flags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.estimate-flags span { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.estimate-flags .flag-missing { background: #fde8ea; color: #b22638; }
+.estimate-flags .flag-dirty { background: #fff3d6; color: #8a5a00; }
+.line-row.unpriced { background: #fff4f5; }
+.line-row.unpriced .line-total { color: #c62839; }
+.line-row .line-total small.missing-note { color: #c62839; font-weight: 600; }
+.line-row .line-field.missing input { border-color: #dc3545; background: #fff0f1; box-shadow: 0 0 0 1px #dc3545 inset; }
+.line-row.dirty { box-shadow: inset 3px 0 0 #e0a100; }
+.line-row .table-actions button.needs-save { border-color: #e0a100; background: #fff6dc; font-weight: 700; }
+[data-theme="dark"] .line-row.unpriced { background: #3a1a20; }
+[data-theme="dark"] .line-row.unpriced .line-total, [data-theme="dark"] .line-row .line-total small.missing-note { color: #ff9aa6; }
+[data-theme="dark"] .line-row .line-field.missing input { background: #4a1f26; border-color: #ff6b7b; box-shadow: 0 0 0 1px #ff6b7b inset; }
+[data-theme="dark"] .estimate-flags .flag-missing { background: #4a1f26; color: #ffb3bd; }
+[data-theme="dark"] .estimate-flags .flag-dirty { background: #3a2f14; color: #ffd98a; }
+[data-theme="dark"] .line-row .table-actions button.needs-save { background: #3a2f14; border-color: #b88a1f; color: #ffd98a; }
 .invoice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 
 .case-extras { display: grid; gap: 18px; margin: 12px 0 20px; }
