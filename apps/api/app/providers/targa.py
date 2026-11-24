@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 REASON_MESSAGES = {
     "no_credit": "Crediti esauriti sul servizio targhe (targa.co.it): ricarica il conto per riattivare la ricerca.",
     "account": "Account del servizio targhe non valido: controlla il nome utente configurato (TARGA_API_USERNAME).",
+    "plate_failed": "Il servizio targhe non ha dati per questa targa (succede spesso con camion, rimorchi e mezzi pesanti): inserisci i dati a mano.",
     "unreachable": "Il servizio targhe non risponde: riprova tra qualche minuto.",
     "error": "Il servizio targhe ha restituito un errore: riprova più tardi.",
 }
@@ -44,6 +45,9 @@ def classify_error(detail: str) -> str | None:
     text = detail.lower()
     if "no vehicle" in text or "not found" in text or "invalid registration" in text:
         return None
+    if "lookup failed" in text:
+        # RegCheck answers "Italian lookup failed" for plates outside its car register.
+        return "plate_failed"
     if "credit" in text or "balance" in text:
         return "no_credit"
     if "username" in text or "authori" in text or "blocked" in text:

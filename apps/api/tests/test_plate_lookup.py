@@ -105,6 +105,7 @@ def test_provider_errors_tell_the_workshop_why(client, monkeypatch):
     assert targa.classify_error("System.Exception: No vehicle found for AB123CD") is None
     assert targa.classify_error("Out of credit, please top up your balance") == "no_credit"
     assert targa.classify_error("Your username is incorrect") == "account"
+    assert targa.classify_error("Italian lookup failed") == "plate_failed"
     assert targa.classify_error("Server was unable to process request") == "error"
 
     class Broken:
