@@ -82,6 +82,13 @@ export default function CostiPage() {
   }, []);
   useEffect(() => { if (getAccessToken()) void load(); }, [range.from, range.to]);
 
+  async function removeExpense(expense: Expense) {
+    if (!confirm(`${t("Eliminare la spesa")} «${expense.description}» (${formatMoney(expense.amount)})?`)) return;
+    const response = await apiFetch(`/expenses/${expense.id}`, { method: "DELETE" });
+    if (!response.ok) { setError(await apiError(response, "Impossibile eliminare la spesa.")); return; }
+    await load();
+  }
+
   const match = (row: { area: string; description?: string; case_number?: string; plate?: string; oem_code?: string | null; supplier?: string | null }) => {
     if (area && row.area !== area) return false;
     const q = query.trim().toLowerCase();
@@ -239,7 +246,7 @@ export default function CostiPage() {
                         <span className="c-main"><strong>{row.description}</strong><small>{row.supplier}<i className="mobile-only">{row.supplier ? " · " : ""}{formatDate(row.date)}</i></small></span>
                         <span className="c-ref">{t(expenseLabel[row.category] || row.category)}</span>
                         <span className="c-area"><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
-                        <strong className="c-amount">{formatMoney(row.amount)}</strong>
+                        <strong className="c-amount">{formatMoney(row.amount)}{canEdit && <button type="button" className="costs-delete" title={t("Elimina spesa")} aria-label={t("Elimina spesa")} onClick={() => void removeExpense(row)}>×</button>}</strong>
                       </div>
                     ))}
                   </div>

@@ -2459,3 +2459,5 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
   .costs-page .data-table[class*="costs-"]:not(.head) { gap: 5px 8px; padding: 11px 12px; }
   .costs-page .data-table > .c-main small { display: block; margin: 2px 0 0; }
 }
+.costs-delete { margin-left: 10px; border: 1px solid #e3c4c9; background: transparent; color: #c0283f; border-radius: 6px; width: 24px; height: 24px; line-height: 1; cursor: pointer; font-size: 15px; }
+.costs-delete:hover { background: #fff0f2; }
