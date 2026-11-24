@@ -15,7 +15,9 @@ export default function WorkshopScenePage() {
  const frame=useRef<HTMLIFrameElement>(null),ready=useRef(false),busy=useRef(false),dataRef=useRef<Snapshot|null>(null),cursor=useRef(0),model=useRef<Vehicle[]>([]),replaying=useRef(false);
  const [revision,setRevision]=useState(0);
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[day,setDay]=useState(romeDay),[playing,setPlaying]=useState(false),[speed,setSpeed]=useState('1'),[index,setIndex]=useState(0),[mode,setMode]=useState<'now'|'replay'>('now'),[blocked,setBlocked]=useState(false),[signedIn,setSignedIn]=useState(true);
- const send=(vehicles:Vehicle[],animate=false)=>{if(ready.current)frame.current?.contentWindow?.postMessage({type:'nakama-scene-snapshot',vehicles,animate},window.location.origin)};
+ const lang=useRef(language);lang.current=language;
+ const send=(vehicles:Vehicle[],animate=false)=>{if(ready.current)frame.current?.contentWindow?.postMessage({type:'nakama-scene-snapshot',vehicles,animate,lang:lang.current},window.location.origin)};
+ useEffect(()=>{if(ready.current)frame.current?.contentWindow?.postMessage({type:'nakama-scene-lang',lang:language},window.location.origin)},[language]);
  useEffect(()=>{
  const message=(e:MessageEvent)=>{if(e.origin!==window.location.origin||e.source!==frame.current?.contentWindow)return;if(e.data?.type==='nakama-scene-ready'){ready.current=true;if(dataRef.current)send(model.current.length?model.current:dataRef.current.vehicles)}if(e.data?.type==='nakama-scene-state'){busy.current=Boolean(e.data.busy);setBlocked(Boolean(e.data.blocked));}};
  window.addEventListener('message',message);return()=>window.removeEventListener('message',message);
