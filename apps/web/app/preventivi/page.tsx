@@ -37,6 +37,7 @@ type Line = {
   description: string;
   quantity: string;
   unit_price: string;
+  markup_percent: string;
   discount_percent: string;
   labor_hours: string;
   labor_rate: string;
@@ -54,11 +55,11 @@ const categories = ["PART", "MECHANICAL_LABOR", "DIAGNOSTIC", "ELECTRICAL", "BOD
 const rateKeyByCategory: Record<string, string> = {
   MECHANICAL_LABOR: "MECHANICAL", DIAGNOSTIC: "DIAGNOSTIC", ELECTRICAL: "ELECTRICAL", BODY_LABOR: "BODY", PAINT: "PAINT",
 };
-const numericFields: (keyof Line)[] = ["quantity", "unit_price", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "paint_rate", "materials", "vat_rate"];
+const numericFields: (keyof Line)[] = ["quantity", "unit_price", "markup_percent", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "paint_rate", "materials", "vat_rate"];
 
 function blankLine(rates: Record<string, string>): Line {
   return {
-    id: "", category: "PART", description: "", quantity: "1", unit_price: "0", discount_percent: "0",
+    id: "", category: "PART", description: "", quantity: "1", unit_price: "0", markup_percent: "0", discount_percent: "0",
     labor_hours: "0", labor_rate: rates.MECHANICAL || "50", paint_hours: "0", paint_rate: rates.PAINT || "48",
     materials: "0", vat_rate: "22",
   };
@@ -78,7 +79,7 @@ function linePayload(line: Line) {
 
 // Column names, shown above each number on phones (the table header is hidden there).
 const fieldLabels: Partial<Record<string, string>> = {
-  quantity: "Q.tà", unit_price: "Prezzo ricambio", discount_percent: "Sconto %", labor_hours: "Ore",
+  quantity: "Q.tà", unit_price: "Prezzo ricambio", markup_percent: "Ricarico %", discount_percent: "Sconto %", labor_hours: "Ore",
   labor_rate: "€/h", paint_hours: "Ore vernice", materials: "Materiali", vat_rate: "IVA %",
 };
 type Shared = {
@@ -205,6 +206,7 @@ export default function PreventiviPage() {
                 <strong>{formatMoney(x.total)}</strong>
                 <span className="table-actions wrap">
                   <button onClick={() => { setOpenId(x.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}>{x.status === "APPROVED" ? t("Apri") : t("Modifica")}</button>
+                  <button onClick={() => { window.location.href = `/preventivi/anteprima?id=${x.id}`; }}>{t("Anteprima")}</button>
                   <button onClick={() => pdf(x)}>PDF</button>
                   {x.status !== "APPROVED" && <button onClick={() => share(x.id)}>{t("Invia")}</button>}
                   {x.status !== "APPROVED" && <button className="tone-button accepted" onClick={() => setEstimateStatus(x.id, "APPROVED")}>{t("Accettato")}</button>}
@@ -325,6 +327,12 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
     return savedId;
   }
 
+  /** Print / WhatsApp preview: unsaved rows are saved first, so the customer sees the real figures. */
+  async function openPreview() {
+    if (dirtyCount > 0) await saveAll();
+    window.location.href = `/preventivi/anteprima?id=${id}`;
+  }
+
   async function saveAll() {
     let ok = true;
     const ids = lines.map((line) => line.id);
@@ -385,6 +393,7 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
         </div>
         <div className="panel-actions">
           {dirtyCount > 0 && <button className="primary" onClick={saveAll} disabled={savingId !== null}>{savingId !== null ? "…" : t("Salva tutto")}</button>}
+          <button className="secondary" onClick={openPreview} disabled={savingId !== null || !estimate}>{t("Anteprima")}</button>
           <button className="secondary" onClick={onClose}>{t("Chiudi")}</button>
         </div>
       </div>
@@ -408,8 +417,8 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
       {locked && estimate && <p className="hint">{t("Il preventivo approvato non è modificabile.")}</p>}
       <div className="line-editor" role="table" aria-label={t("Righe del preventivo")}>
         <div className="line-row head" role="row">
-          <span>{t("Tipo")}</span><span>{t("Descrizione")}</span><span>{t("Q.tà")}</span><span>{t("Prezzo ricambio")}</span><span>{t("Sconto %")}</span>
-          <span>{t("Ore")}</span><span>{t("€/h")}</span><span>{t("Ore vernice")}</span><span>{t("Materiali")}</span><span>{t("IVA %")}</span><span>{t("Totale")}</span><span />
+          <span>{t("Tipo")}</span><span>{t("Descrizione")}</span><span>{t("Q.tà")}</span><span>{t("Prezzo ricambio")}</span><span title={t("Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.")}className="internal-head">{t("Ricarico %")}</span><span>{t("Sconto %")}</span>
+          <span>{t("Ore")}</span><span>{t("€/h")}</span><span>{t("Ore vernice")}</span><span>{t("Materiali")}</span><span>{t("IVA %")}</span><span className="num">{t("Imponibile")}</span><span className="num">{t("Totale")}</span><span />
         </div>
         {lines.length === 0 && <div className="empty-state">{t("Nessuna riga. Aggiungi ricambi e manodopera.")}</div>}
         {lines.map((line, index) => (
@@ -418,12 +427,16 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
               {categories.map((code) => <option key={code} value={code}>{t(code)}</option>)}
             </select>
             <input aria-label={t("Descrizione")} disabled={locked} value={line.description} maxLength={255} onChange={(e) => update(index, { description: e.target.value })} />
-            {(["quantity", "unit_price", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "materials", "vat_rate"] as (keyof Line)[]).map((field) => (
-              <label key={field} className={`line-field${priced[index].missing.has(field as never) ? " missing" : ""}`}>
+            {(["quantity", "unit_price", "markup_percent", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "materials", "vat_rate"] as (keyof Line)[]).map((field) => (
+              <label key={field} className={`line-field${priced[index].missing.has(field as never) ? " missing" : ""}${field === "markup_percent" ? " internal" : ""}`} title={field === "markup_percent" ? t("Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.") : undefined}>
                 <small>{t(fieldLabels[field] || String(field))}</small>
                 <input aria-label={t(fieldLabels[field] || String(field))} type="number" inputMode="decimal" min="0" step="0.01" disabled={locked} value={line[field] || ""} onChange={(e) => update(index, { [field]: e.target.value } as Partial<Line>)} />
               </label>
             ))}
+            <span className="line-net">
+              <small>{t("Imponibile")}</small>
+              {formatMoney(priced[index].amounts.subtotal)}
+            </span>
             <span className="line-total">
               {formatMoney(priced[index].amounts.total)}
               {priced[index].missing.size > 0 && <small className="missing-note">{t("senza prezzo")}</small>}
@@ -437,6 +450,14 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
             </span>
           </div>
         ))}
+        {lines.length > 0 && (
+          <div className="line-row totals-row estimate-sum" role="row">
+            <span className="sum-label">{t("Totale preventivo")}</span>
+            <span className="line-net"><small>{t("Imponibile")}</small>{formatMoney(liveSubtotal)}</span>
+            <span className="line-total"><small className="sum-vat">{t("IVA")} {formatMoney(liveVat)}</small>{formatMoney(liveTotal)}</span>
+            <span />
+          </div>
+        )}
       </div>
       {!locked && <button className="secondary add-line" onClick={() => setLines((previous) => [...previous, blankLine(rates)])}>{t("+ Riga")}</button>}
     </section>

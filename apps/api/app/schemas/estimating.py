@@ -38,6 +38,7 @@ class EstimateLineCreate(BaseModel):
     description: str
     quantity: Decimal = Field(default=Decimal("1"), ge=0)
     unit_price: Decimal = Field(default=Decimal("0"), ge=0)
+    markup_percent: Decimal = Field(default=Decimal("0"), ge=0, le=1000)
     discount_percent: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     labor_hours: Decimal = Field(default=Decimal("0"), ge=0)
     labor_rate: Decimal = Field(default=Decimal("0"), ge=0)
