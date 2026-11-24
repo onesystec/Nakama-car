@@ -58,6 +58,7 @@ class VehicleCreate(BaseModel):
     fuel_type: str | None = Field(default=None, max_length=40)
     engine_size: str | None = Field(default=None, max_length=20)
     power_kw: int | None = Field(default=None, ge=0, le=2000)
+    engine_code: str | None = Field(default=None, max_length=40)
 
 
 class VehicleRead(VehicleCreate):
@@ -135,6 +136,7 @@ class VehicleUpdate(BaseModel):
     fuel_type: str | None = Field(default=None, max_length=40)
     engine_size: str | None = Field(default=None, max_length=20)
     power_kw: int | None = Field(default=None, ge=0, le=2000)
+    engine_code: str | None = Field(default=None, max_length=40)
 
 
 class RepairCaseUpdate(BaseModel):

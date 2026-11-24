@@ -3,6 +3,7 @@ from app.api.v1 import workshop_scene
 from app.api.v1 import datev, password_recovery
 
 from app.api.v1 import approvals, assistant, audit, staff, auth, billing, cases, company, contracts, customers, damages, dashboard, estimates, fleet, integrations, media, portal, renders, tracking, users, vehicles, workshop
+from app.api.v1 import technical_sheets
 
 api_router = APIRouter()
 api_router.include_router(workshop_scene.router)
@@ -31,6 +32,7 @@ api_router.include_router(fleet.router)
 api_router.include_router(integrations.router)
 api_router.include_router(assistant.router)
 api_router.include_router(staff.router)
+api_router.include_router(technical_sheets.router)
 
 
 @api_router.get("/health", tags=["system"])

@@ -7,6 +7,7 @@ import { apiError, apiFetch, getAccessToken, sessionUser, SessionUser } from "..
 import { mechanicalCatalog } from "../../lib/mechanicalCatalog";
 import { askText } from "../../lib/askText";
 import { VehicleFront } from "../../components/VehicleFront";
+import { TechnicalSheet } from "../../components/TechnicalSheet";
 import { QuickKind, QuickPick, QuickPicker } from "../../components/QuickPicker";
 import { CheckInPhotos, DiagnosisPhoto, FuelGauge, PendingPhoto, SavedPhoto } from "../../components/CheckIn";
 
@@ -20,7 +21,7 @@ type Diagnosis = {
   lines: { kind: Kind; description: string; oem_code: string | null; quantity: string; unit_price: string | null }[];
 };
 type VehicleData = { make: string | null; model: string | null; version?: string | null; year: number | null; fuel_type?: string | null; engine_size?: string | null; power_kw?: number | null; vin?: string | null };
-type KnownVehicle = VehicleData & { color: string | null; category: string; mileage: number | null; customer_name: string | null };
+type KnownVehicle = VehicleData & { license_plate: string; color: string | null; category: string; mileage: number | null; customer_name: string | null };
 type PlateData = VehicleData;
 type Customer = { id: string; first_name?: string | null; last_name?: string | null; company_name?: string | null };
 
@@ -183,6 +184,7 @@ export default function DiagnosiPage() {
   // Typing a plate shows what we know of the vehicle. A plate we do not know (or know without make/model) asks the
   // plate service (targa.co.it): the answer is only shown, and «Registra dati» saves it on the vehicle after a confirm.
   const [known, setKnown] = useState<KnownVehicle | null>(null);
+  const [showSheet, setShowSheet] = useState(false);
   const [plateData, setPlateData] = useState<PlateData | null>(null);
   const [plateNote, setPlateNote] = useState("");
   const [plateSearch, setPlateSearch] = useState<"idle" | "new" | "searching" | "saving">("idle");
@@ -235,6 +237,7 @@ export default function DiagnosiPage() {
   }
   useEffect(() => {
     setKnown(null);
+    setShowSheet(false);
     setPlateData(null);
     setPlateNote("");
     setPlateSearch("idle");
@@ -394,9 +397,13 @@ export default function DiagnosiPage() {
                 {vehicleRows(known, [["Cliente", known.customer_name], ["Ultimi km", known.mileage ? known.mileage.toLocaleString("it-IT") : null]])}
                 {plateNote && <small>{t(plateNote)}</small>}
               </div>
-              {!editing && !plateData && <button type="button" className="secondary" disabled={plateSearch === "searching"} onClick={() => void lookupPlateData(plateKey)}>{t(plateSearch === "searching" ? "Ricerca in corso…" : "Cerca dati veicolo")}</button>}
+              <div className="vehicle-card-actions">
+                <button type="button" className={showSheet ? "primary" : "secondary"} onClick={() => setShowSheet(!showSheet)}>{t("Scheda tecnica")}</button>
+                {!editing && !plateData && <button type="button" className="secondary" disabled={plateSearch === "searching"} onClick={() => void lookupPlateData(plateKey)}>{t(plateSearch === "searching" ? "Ricerca in corso…" : "Cerca dati veicolo")}</button>}
+              </div>
             </div>
           )}
+          {known && showSheet && <div className="span-all"><TechnicalSheet key={known.license_plate} plate={known.license_plate} onClose={() => setShowSheet(false)} /></div>}
           {plateData && (
             <div className="known-vehicle vehicle-card found">
               <VehicleFront make={plateData.make} model={plateData.model} year={plateData.year} size={96} />
