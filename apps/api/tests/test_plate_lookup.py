@@ -99,3 +99,22 @@ def test_fuel_engine_and_power_are_read_from_the_version_text():
     assert (vehicle.fuel_type, vehicle.engine_size, vehicle.power_kw) == ("Ibrida", "1.0 L", 51)
     assert targa.infer_from_description("Ducato 35 2.3 MJT 140CV") == {"fuel_type": "Diesel", "engine_size": "2.3 L", "power_kw": 103}
     assert targa.enrich({"power_kw": 0})["power_kw"] is None
+
+
+def test_provider_errors_tell_the_workshop_why(client, monkeypatch):
+    assert targa.classify_error("System.Exception: No vehicle found for AB123CD") is None
+    assert targa.classify_error("Out of credit, please top up your balance") == "no_credit"
+    assert targa.classify_error("Your username is incorrect") == "account"
+    assert targa.classify_error("Server was unable to process request") == "error"
+
+    class Broken:
+        name = "targa.co.it"
+
+        def find_by_plate(self, plate, country="IT"):
+            raise targa.PlateLookupError("boom", "no_credit")
+
+    c, _, _ = client
+    monkeypatch.setattr(targa, "get_vehicle_data_provider", lambda: Broken())
+    response = c.get("/api/v1/vehicles/plate-data/GH789IJ")
+    assert response.status_code == 502
+    assert "Crediti esauriti" in response.json()["detail"]

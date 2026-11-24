@@ -6,7 +6,7 @@ import { DamageMarker, DamagePhotoMap, operationStyle } from "../components/Dama
 import { useLanguage } from "../components/LanguageProvider";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch, getAccessToken, clearSession, customerLabel, homeFor, sessionUser, uploadCasePhoto } from "../lib/api";
+import { apiError, apiFetch, getAccessToken, clearSession, customerLabel, homeFor, sessionUser, uploadCasePhoto } from "../lib/api";
 import { loadPlateSpots, PlateSpots, savePlateSpot } from "../lib/plateSpots";
 import { NewEstimateChooser } from "../components/NewEstimateChooser";
 import { catalogItems, mechanicalCatalog } from "../lib/mechanicalCatalog";
@@ -278,7 +278,7 @@ export default function HomePage() {
         return;
       }
       if (!r.ok) {
-        setPlateLookupMessage("Servizio targhe non disponibile: inserisci i dati a mano.");
+        setPlateLookupMessage(`${await apiError(r, "Servizio targhe non disponibile.")} Intanto inserisci i dati a mano.`);
         return;
       }
       const data = await r.json();
