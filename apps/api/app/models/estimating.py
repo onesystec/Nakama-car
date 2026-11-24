@@ -95,6 +95,8 @@ class EstimateLine(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=1)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    # Workshop's markup on the part cost: internal, never printed for the customer.
+    markup_percent: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, default=0, server_default="0")
     discount_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=0)
     labor_hours: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False, default=0)
     labor_rate: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)

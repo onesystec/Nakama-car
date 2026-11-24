@@ -44,14 +44,15 @@ def price_line(line, terms: PricingTerms = PUBLIC_TERMS) -> LineAmounts:
     """Price one estimate line.
 
     ``line`` is any object with the estimate line fields (schema or model).
-    Parts and materials are charged at the entered price, minus the line discount,
-    plus the contract markup. Labor (workshop and paint hours) is charged at 0 when
+    Parts are charged at the entered cost plus the workshop's markup on that cost,
+    minus the line discount; materials are added, then the contract markup. Labor (workshop and paint hours) is charged at 0 when
     the contract includes it, otherwise at the hourly rate minus the contract discount.
     """
     quantity = Decimal(line.quantity)
     discount = Decimal(line.discount_percent or 0) / HUNDRED
     markup = terms.parts_markup_percent / HUNDRED
-    parts = quantity * Decimal(line.unit_price) * (Decimal("1") - discount)
+    cost_markup = Decimal(getattr(line, "markup_percent", 0) or 0) / HUNDRED
+    parts = quantity * Decimal(line.unit_price) * (Decimal("1") + cost_markup) * (Decimal("1") - discount)
     parts = (parts + Decimal(line.materials)) * (Decimal("1") + markup)
     labor = Decimal(line.labor_hours) * Decimal(line.labor_rate) + Decimal(line.paint_hours) * Decimal(line.paint_rate)
     if terms.labor_included:

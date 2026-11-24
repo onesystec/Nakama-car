@@ -1,13 +1,13 @@
 """Technical sheet per model + engine and engine code on vehicles.
 
-Revision ID: 0034_technical_sheets
-Revises: 0033_estimate_line_position
+Revision ID: 0036_technical_sheets
+Revises: 0035_workshop_expenses
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0034_technical_sheets"
-down_revision = "0033_estimate_line_position"
+revision = "0036_technical_sheets"
+down_revision = "0035_workshop_expenses"
 branch_labels = None
 depends_on = None
 

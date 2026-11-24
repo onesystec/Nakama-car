@@ -988,7 +988,7 @@ html[data-theme="dark"], html[data-theme="dark"] body { background: #0b1725; col
 .pricing-banner.contract { background: #fff6e3; border: 1px solid #f0d49a; }
 .estimate-editor .panel-head p { font-size: 12px; }
 .line-editor { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; }
-.line-row { display: grid; grid-template-columns: 140px minmax(200px, 2fr) repeat(8, minmax(70px, .6fr)) 110px 150px; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); min-width: 1240px; font-size: 12px; }
+.line-row { display: grid; grid-template-columns: 140px minmax(200px, 2fr) repeat(9, minmax(66px, .6fr)) 100px 110px 150px; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); min-width: 1400px; font-size: 12px; }
 .line-row:last-child { border-bottom: 0; }
 .line-row.head { background: #f8f9fa; color: #7d8289; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .line-row input, .line-row select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 7px; font: inherit; background: var(--panel); color: inherit; }
@@ -1009,10 +1009,20 @@ html[data-theme="dark"], html[data-theme="dark"] body { background: #0b1725; col
 .line-row .line-total small.missing-note { color: #c62839; font-weight: 600; }
 .line-row .line-field.missing input { border-color: #dc3545; background: #fff0f1; box-shadow: 0 0 0 1px #dc3545 inset; }
 .line-row.dirty { box-shadow: inset 3px 0 0 #e0a100; }
+.line-row .line-net { text-align: right; color: var(--muted); font-weight: 600; }
+.line-row .line-net small { display: none; }
+.line-row.head .num { text-align: right; }
+.line-row .line-field.internal input { border-style: dashed; background: #f6f8fb; }
+.line-row.head .internal-head { color: #1257a0; }
+.line-row.estimate-sum { font-size: 14px; }
+.line-row.estimate-sum .sum-label { grid-column: 1 / span 11; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 12px; }
+.line-row.estimate-sum .line-total { font-size: 16px; }
+.line-row.estimate-sum .line-total small.sum-vat { color: var(--muted); font-weight: 500; }
 .line-row .table-actions .move-line { font-size: 12px; padding: 4px 7px; line-height: 1; }
 .line-row .table-actions .move-line:disabled { opacity: .35; cursor: default; }
 .line-row .table-actions button.needs-save { border-color: #e0a100; background: #fff6dc; font-weight: 700; }
 [data-theme="dark"] .line-row.unpriced { background: #3a1a20; }
+[data-theme="dark"] .line-row .line-field.internal input { background: #182b3f; }
 [data-theme="dark"] .line-row.unpriced .line-total, [data-theme="dark"] .line-row .line-total small.missing-note { color: #ff9aa6; }
 [data-theme="dark"] .line-row .line-field.missing input { background: #4a1f26; border-color: #ff6b7b; box-shadow: 0 0 0 1px #ff6b7b inset; }
 [data-theme="dark"] .estimate-flags .flag-missing { background: #4a1f26; color: #ffb3bd; }
@@ -1586,6 +1596,10 @@ body:has(.modal-backdrop) .chat-bubble-fab, body:has(.modal-backdrop) .chat-bubb
   .line-row > select, .line-row > input { grid-column: 1 / -1; }
   .line-field small { display: block; font-size: 11px; color: #62666d; margin-bottom: 2px; }
   .line-row .line-total { grid-column: 1 / -1; text-align: left; font-size: 16px; }
+  .line-row .line-net { text-align: left; }
+  .line-row .line-net small { display: block; font-size: 11px; color: #62666d; font-weight: 500; }
+  .line-row.estimate-sum .sum-label { grid-column: 1 / -1; }
+  .line-row.estimate-sum .line-net, .line-row.estimate-sum .line-total { grid-column: auto; }
   .line-row .table-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
   .line-row .table-actions button { flex: 1; min-height: 42px; }
   .line-row.invoice { grid-template-columns: 1fr 1fr; }
@@ -2315,3 +2329,159 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .technical-sheet-actions .hint { margin: 0; }
 .technical-sheet-form label.from-libretto input { border-color: #d4a017; background: #fff8e1; }
 .technical-sheet-form label.from-libretto small { color: #8a6500; font-size: 12px; }
+
+/* Estimate preview: the sheet the customer receives, ready to print or send on WhatsApp. */
+.estimate-preview-page { min-height: 100vh; background: #e9edf2; padding: 16px; }
+.preview-toolbar { max-width: 210mm; margin: 0 auto 14px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+.preview-toolbar .ghost-link { color: #1257a0; font-weight: 600; text-decoration: none; }
+.preview-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-actions .whatsapp { background: #1fa855; }
+.preview-actions .whatsapp:hover { background: #178a45; }
+.preview-loading { text-align: center; color: #62666d; }
+.estimate-preview-page .record-error { max-width: 210mm; margin: 0 auto 14px; background: white; }
+.estimate-sheet { max-width: 210mm; margin: 0 auto; background: white; color: #1b1f24; padding: 16mm; box-shadow: 0 4px 24px rgba(11, 42, 74, .12); border-radius: 4px; font-size: 12px; box-sizing: border-box; }
+.sheet-company { display: flex; gap: 16px; align-items: center; padding-bottom: 10px; border-bottom: 2px solid #0b2a4a; }
+.sheet-company img { width: 96px; height: 96px; object-fit: contain; }
+.sheet-company h1 { margin: 0 0 4px; font-size: 22px; color: #0b2a4a; }
+.sheet-company p { margin: 1px 0; font-size: 11.5px; color: #3a4149; }
+.estimate-sheet h2 { font-size: 17px; margin: 18px 0 10px; color: #0b2a4a; }
+.sheet-info { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 14px; border: 1px solid #d9dde2; }
+.sheet-info div { display: grid; grid-template-columns: 34% 1fr; border-bottom: 1px solid #d9dde2; }
+.sheet-info div:nth-last-child(-n + 2) { border-bottom: 0; }
+.sheet-info div:nth-child(odd) { border-right: 1px solid #d9dde2; }
+.sheet-info dt { background: #f4f5f6; padding: 6px 8px; font-weight: 600; color: #4a525b; }
+.sheet-info dd { margin: 0; padding: 6px 8px; }
+.sheet-info .plate { font-weight: 800; letter-spacing: .06em; }
+.sheet-note { background: #fff6e3; border: 1px solid #f0d49a; padding: 8px 10px; border-radius: 6px; }
+.sheet-lines { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+.sheet-lines th { background: #0b2a4a; color: white; text-align: right; padding: 6px; font-weight: 700; }
+.sheet-lines th:first-child, .sheet-lines td:first-child { text-align: left; }
+.sheet-lines td { border-bottom: 1px solid #d9dde2; padding: 6px; text-align: right; white-space: nowrap; }
+.sheet-lines td:first-child { white-space: normal; }
+.sheet-lines td:last-child { font-weight: 700; }
+.sheet-totals { margin: 14px 0 0 auto; border-collapse: collapse; min-width: 260px; font-size: 13px; }
+.sheet-totals th { text-align: left; font-weight: 500; padding: 5px 10px; }
+.sheet-totals td { text-align: right; padding: 5px 10px; }
+.sheet-totals .grand th, .sheet-totals .grand td { font-weight: 800; font-size: 15px; border-top: 2px solid #0b2a4a; }
+.sheet-conditions h3 { font-size: 13px; margin: 22px 0 4px; }
+.sheet-conditions p { margin: 0; color: #3a4149; }
+.sheet-signatures { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin-top: 34px; }
+@media (max-width: 700px) {
+  .estimate-preview-page { padding: 10px; }
+  .estimate-sheet { padding: 14px; overflow-x: auto; }
+  .sheet-info { grid-template-columns: 1fr; }
+  .sheet-info div:nth-child(odd) { border-right: 0; }
+  .sheet-info div:nth-last-child(2) { border-bottom: 1px solid #d9dde2; }
+  .preview-actions { width: 100%; }
+  .preview-actions button { flex: 1; min-height: 44px; padding: 0 8px; font-size: 14px; }
+}
+@media print {
+  @page { size: A4; margin: 12mm; }
+  .no-print { display: none !important; }
+  .estimate-preview-page { background: white; padding: 0; min-height: 0; }
+  .estimate-sheet { box-shadow: none; padding: 0; max-width: none; border-radius: 0; }
+  .sheet-lines th, .sheet-info dt, .sheet-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Costi officina: costs split by Meccanica / Carrozzeria. */
+.costs-page { --mecc: #1558a5; --carr: #d9822b; }
+.costs-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin: 18px 0 16px; }
+.costs-period { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.costs-period label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.costs-period input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; font: inherit; font-size: 13px; background: var(--panel, white); color: inherit; }
+.costs-area { display: inline-flex; border: 1px solid #dce5ed; border-radius: 10px; padding: 3px; background: #f3f6f9; gap: 2px; }
+.costs-area button { border: 0; background: transparent; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; color: var(--muted); cursor: pointer; }
+.costs-area button.active { background: white; color: var(--nakama-navy); box-shadow: 0 1px 4px rgba(11,42,74,.12); }
+.costs-area button.area-mechanical.active { color: var(--mecc); }
+.costs-area button.area-body.active { color: var(--carr); }
+.costs-kpis .kpi-card { text-align: left; font: inherit; cursor: pointer; }
+.costs-kpis .kpi-card:hover { border-color: #b9cbdc; }
+.costs-search input { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; margin-bottom: 12px; font: inherit; background: var(--panel, white); color: inherit; }
+.costs-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.costs-compare.single { grid-template-columns: 1fr; }
+.costs-area-card { border-top: 4px solid var(--mecc) !important; }
+.costs-area-card.area-body { border-top-color: var(--carr) !important; }
+.costs-area-card .panel-head h2 { font-size: 18px; }
+.costs-area-total { font-size: 26px; letter-spacing: -.03em; color: var(--nakama-navy); }
+.costs-breakdown { margin: 0; padding: 6px 20px 4px; }
+.costs-breakdown div { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px dashed #e4e9ef; font-size: 14px; }
+.costs-breakdown div:last-child { border-bottom: 0; }
+.costs-breakdown dt small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.costs-breakdown dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.costs-bar { display: flex; height: 10px; margin: 6px 20px 18px; border-radius: 6px; overflow: hidden; background: #eef2f6; gap: 2px; }
+.costs-bar i, .costs-legend i { display: block; }
+.seg-parts { background: #0b2a4a; } .seg-labor_value { background: #2f7fd8; } .seg-materials { background: #22a06b; }
+.seg-external { background: #8e5bd6; } .seg-other { background: #9aa5b1; } .seg-expenses { background: #e0475b; }
+.costs-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 10px 2px; }
+.costs-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.costs-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.costs-grand { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; align-items: center; padding: 16px 20px; margin-top: 14px; }
+.costs-grand span { font-weight: 700; font-size: 14px; }
+.costs-grand small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.costs-grand strong { font-size: 17px; text-align: right; font-variant-numeric: tabular-nums; }
+.costs-grand > div:nth-of-type(2) { border-top: 1px solid var(--line); padding-top: 10px; }
+.costs-grand-total { font-size: 24px !important; color: var(--nakama-navy); border-top: 1px solid var(--line); padding-top: 10px; }
+.costs-page .panel-head > strong { font-size: 18px; color: var(--nakama-navy); }
+.data-table.costs-parts { grid-template-columns: .7fr 2fr 1.1fr .9fr .4fr .8fr .8fr; font-size: 12px; }
+.data-table.costs-hours { grid-template-columns: 1.2fr .9fr 1fr .8fr .7fr .8fr .8fr; font-size: 12px; }
+.data-table.costs-other { grid-template-columns: .7fr 2fr 1fr 1.1fr .9fr .8fr; font-size: 12px; }
+.data-table.costs-expenses { grid-template-columns: .7fr 2.2fr 1.2fr .9fr .8fr; font-size: 12px; }
+.data-table.head[class*="costs-"] { font-size: 9px; }
+.plate-text { font-family: ui-monospace, Menlo, monospace; letter-spacing: .05em; font-weight: 700; color: var(--nakama-navy) !important; }
+.area-pill { font-style: normal; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #e8f0fb; color: var(--mecc); white-space: nowrap; }
+.area-pill.area-body { background: #fdf0e3; color: #b8651a; }
+.area-pill.area-general { background: #eef1f4; color: #5b6570; }
+.costs-expense-form { padding: 18px 20px; margin-bottom: 14px; }
+.costs-expense-form h2 { grid-column: 1 / -1; font-size: 16px; margin: 0; }
+.costs-expense-form .wide { grid-column: 1 / -1; }
+[data-theme="dark"] .costs-area { background: #10223a; border-color: #23405f; }
+[data-theme="dark"] .costs-area button.active { background: #1a3352; color: #e7eef7; }
+[data-theme="dark"] :is(.costs-area-total, .costs-grand-total, .costs-page .panel-head > strong, .plate-text) { color: #e7eef7 !important; }
+@media (max-width: 900px) {
+  .costs-compare { grid-template-columns: 1fr; }
+  .costs-toolbar { align-items: stretch; }
+  .costs-area { width: 100%; } .costs-area button { flex: 1; padding: 9px 6px; }
+  .costs-expense-form { grid-template-columns: 1fr; }
+}
+.costs-page { padding-bottom: 80px; }
+.costs-kpis .kpi-card { min-width: 0; }
+@media (max-width: 600px) {
+  .costs-kpis .kpi-card { padding: 14px; min-height: 0; }
+  .costs-kpis .kpi-card strong { font-size: 22px; }
+  .costs-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .costs-tabs button { flex: none; }
+}
+
+/* Costi officina on phones: one wide row per item. Name and amount on top, details on a second line. */
+.costs-page .mobile-only { display: none; font-style: normal; }
+@media (max-width: 900px) {
+  .costs-page .data-table[class*="costs-"].head { display: none; }
+  .costs-page .data-table[class*="costs-"]:not(.head) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+    grid-template-areas: "main main main amount" "ref ref area sub";
+    gap: 6px 12px; padding: 12px 14px; align-items: center; font-size: 12px;
+  }
+  .costs-page .data-table > .c-main { grid-area: main; font-size: 14px; }
+  .costs-page .data-table > .c-main strong { white-space: normal; }
+  .costs-page .data-table > .c-main small { display: inline; margin-left: 8px; }
+  .costs-page .data-table > .c-amount { grid-area: amount; text-align: right; white-space: nowrap; font-size: 15px; color: var(--nakama-navy); }
+  .costs-page .data-table > .c-date { grid-area: date; color: var(--muted); font-size: 12px; }
+  .costs-page .data-table > .c-date small { display: inline; margin-left: 4px; }
+  .costs-page .data-table > .c-ref { grid-area: ref; font-size: 12px; }
+  .costs-page .data-table > .c-ref small { display: inline; margin-left: 6px; }
+  .costs-page .data-table > .c-area { grid-area: area; }
+  .costs-page .data-table > .c-sub { grid-area: sub; text-align: right; color: var(--muted); font-size: 12px; }
+  .costs-page .data-table > :is(.c-date, .c-ref, .c-area, .c-sub) { white-space: nowrap; }
+  .costs-page .data-table > .c-ref { overflow: hidden; text-overflow: ellipsis; }
+  .costs-page .data-table > .c-x, .costs-page .data-table > .c-date { display: none; }
+  .costs-page .data-table.costs-hours:not(.head) { grid-template-areas: "main main main amount" "date date area sub"; }
+  .costs-page .data-table.costs-hours > .c-date { display: block; }
+  .costs-page .data-table.costs-hours > .c-ref { display: none; }
+  .costs-page .mobile-only { display: inline; }
+}
+@media (max-width: 420px) {
+  .costs-page .data-table[class*="costs-"]:not(.head) { gap: 5px 8px; padding: 11px 12px; }
+  .costs-page .data-table > .c-main small { display: block; margin: 2px 0 0; }
+}
+.costs-delete { margin-left: 10px; border: 1px solid #e3c4c9; background: transparent; color: #c0283f; border-radius: 6px; width: 24px; height: 24px; line-height: 1; cursor: pointer; font-size: 15px; }
+.costs-delete:hover { background: #fff0f2; }
