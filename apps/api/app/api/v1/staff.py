@@ -533,9 +533,9 @@ def diagnosis_to_estimate(
             category=category.get(line.kind, EstimateLineCategory.OTHER), description=line.description, part=line.description if line.kind == "PART" else None,
             oem_code=line.oem_code, quantity=line.quantity, unit_price=line.unit_price or Decimal("0"),
         ))
-    for line in lines:
+    for position, line in enumerate(lines, start=1):
         subtotal, vat, total = calculate_line(line, terms)
-        db.add(EstimateLine(tenant_id=auth.tenant_id, estimate_id=estimate.id, line_subtotal=subtotal, line_vat=vat, line_total=total, **line.model_dump()))
+        db.add(EstimateLine(tenant_id=auth.tenant_id, estimate_id=estimate.id, line_subtotal=subtotal, line_vat=vat, line_total=total, position=position, **line.model_dump()))
     db.flush()
     recalculate(db, estimate)
     diagnosis.status = DiagnosisStatus.CONVERTED

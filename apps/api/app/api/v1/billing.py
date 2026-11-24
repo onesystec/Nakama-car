@@ -152,7 +152,7 @@ def create_invoice_from_estimate(
             EstimateLine.estimate_id == estimate.id,
             EstimateLine.tenant_id == auth.tenant_id,
         )
-        .order_by(EstimateLine.created_at, EstimateLine.id)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
     for line in estimate_lines:
         quantity = line.quantity if line.quantity else Decimal("1")

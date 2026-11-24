@@ -109,7 +109,7 @@ def case_parts(db: Session, case: RepairCase, *, include_draft: bool) -> list[di
     lines = db.scalars(
         select(EstimateLine)
         .where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == case.tenant_id)
-        .order_by(EstimateLine.created_at, EstimateLine.id)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
     seen: set[str] = set()
     parts = []
