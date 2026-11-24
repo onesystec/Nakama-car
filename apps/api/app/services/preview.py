@@ -39,6 +39,27 @@ def claim_test_database(engine: Engine) -> None:
         connection.execute(text(f"INSERT INTO {MARKER_TABLE} (note) VALUES ('test copy, safe to wipe')"))
 
 
+def wipe_if_unknown_revision(engine: Engine, known_revisions: set[str]) -> bool:
+    """A test copy migrated by an older version of its PR (a migration later renumbered) can't be upgraded:
+    alembic does not know the revision it is at. Test data is disposable, so start again from empty.
+    Only ever called after claim_test_database, so it never touches a real database."""
+    if "alembic_version" not in set(inspect(engine).get_table_names()):
+        return False
+    with engine.connect() as connection:
+        current = {row[0] for row in connection.execute(text("SELECT version_num FROM alembic_version"))}
+    if current <= known_revisions:
+        return False
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(text("DROP SCHEMA public CASCADE"))
+            connection.execute(text("CREATE SCHEMA public"))
+        else:
+            for table in reversed(inspect(engine).get_table_names()):
+                connection.execute(text(f'DROP TABLE "{table}"'))
+    claim_test_database(engine)
+    return True
+
+
 def seed_demo_data(db: Session) -> bool:
     """Demo workshop with an admin and a few customers and vehicles. Does nothing once someone exists."""
     from app.api.v1.auth import create_workshop

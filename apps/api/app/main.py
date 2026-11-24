@@ -22,6 +22,9 @@ def prepare_test_copy() -> None:
     from app.db.session import SessionLocal, engine
 
     preview.claim_test_database(engine)
+    from alembic.script import ScriptDirectory
+    known = {script.revision for script in ScriptDirectory.from_config(Config("alembic.ini")).walk_revisions()}
+    preview.wipe_if_unknown_revision(engine, known)
     upgrade_database()
     with SessionLocal() as db:
         preview.seed_demo_data(db)

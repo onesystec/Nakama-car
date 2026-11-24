@@ -90,3 +90,15 @@ def test_bootstrap_still_refuses_a_second_initialization(engine, monkeypatch):
         assert response.status_code == 409
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_test_copy_at_a_renumbered_migration_starts_again_from_empty(engine):
+    preview.claim_test_database(engine)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32))"))
+        connection.execute(text("INSERT INTO alembic_version VALUES ('0034_old_number')"))
+        connection.execute(text("CREATE TABLE customers (id INTEGER)"))
+    assert preview.wipe_if_unknown_revision(engine, {"0034_old_number"}) is False
+    assert preview.wipe_if_unknown_revision(engine, {"0035_new"}) is True
+    from sqlalchemy import inspect
+    assert set(inspect(engine).get_table_names()) == {preview.MARKER_TABLE}
