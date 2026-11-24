@@ -6,8 +6,9 @@ from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from app.services.company import LOGO_PATH, company_lines, company_profile
 from app.services.pricing import PUBLIC_TERMS, price_line
 
 NAVY = colors.HexColor("#0B2A4A")
@@ -34,6 +35,7 @@ def _styles():
     styles.add(ParagraphStyle(name="Right", parent=styles["BodyText"], alignment=TA_RIGHT))
     styles.add(ParagraphStyle(name="Small", parent=styles["BodyText"], fontSize=7.5, leading=9.5))
     styles.add(ParagraphStyle(name="Cell", parent=styles["BodyText"], fontSize=7.5, leading=9))
+    styles.add(ParagraphStyle(name="CompanyName", parent=styles["BodyText"], fontSize=15, leading=19, textColor=NAVY, spaceAfter=2))
     return styles
 
 
@@ -51,27 +53,22 @@ def _doc(buffer: BytesIO, title: str) -> SimpleDocTemplate:
 
 
 def _company_block(company_name: str, settings, styles) -> list:
-    details = []
-    if settings is not None:
-        address = ", ".join(filter(None, [
-            settings.address,
-            " ".join(filter(None, [settings.postal_code, settings.city, f"({settings.province})" if settings.province else None])),
-        ]))
-        if address:
-            details.append(address)
-        fiscal = " · ".join(filter(None, [
-            f"P.IVA {settings.vat_number}" if settings.vat_number else None,
-            f"C.F. {settings.tax_code}" if settings.tax_code else None,
-        ]))
-        if fiscal:
-            details.append(fiscal)
-        contacts = " · ".join(filter(None, [settings.phone, settings.email, settings.pec]))
-        if contacts:
-            details.append(contacts)
-    block = [Paragraph(escape(company_name), styles["Title"])]
-    for line in details:
-        block.append(Paragraph(escape(line), styles["Small"]))
-    return block
+    """Logo on the left, the workshop's name and billing details on the right."""
+    profile = company_profile(settings)
+    name = (getattr(settings, "company_name", None) or profile["company_name"]) if settings is not None else profile["company_name"]
+    text = [Paragraph(f"<b>{escape(name)}</b>", styles["CompanyName"])]
+    text += [Paragraph(escape(line), styles["Small"]) for line in company_lines(profile)]
+    if LOGO_PATH.exists():
+        header = Table([[Image(str(LOGO_PATH), width=28 * mm, height=28 * mm), text]], colWidths=[32 * mm, None])
+    else:
+        header = Table([[text]])
+    header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LINEBELOW", (0, 0), (-1, -1), 1, NAVY),
+    ]))
+    return [header, Spacer(1, 5 * mm)]
 
 
 def _grid_style(header: bool = True) -> TableStyle:
@@ -122,6 +119,10 @@ def _totals_table(subtotal, vat_total, total) -> Table:
     return totals
 
 
+def _date(value) -> str:
+    return value.strftime("%d/%m/%Y") if value else "—"
+
+
 def customer_name(customer) -> str:
     if customer is None:
         return "—"
@@ -147,7 +148,7 @@ def build_estimate_pdf(
     story.append(Spacer(1, 4 * mm))
 
     story.append(_info_table([
-        ["Preventivo", estimate.estimate_number, "Versione", str(estimate.version)],
+        ["Preventivo", estimate.estimate_number, "Data", _date(getattr(estimate, "created_at", None))],
         ["Cliente", customer_name(customer), "Targa", vehicle.license_plate],
         ["Veicolo", " ".join(filter(None, [vehicle.make, vehicle.model, vehicle.version])) or "—", "VIN / Telaio", vehicle.vin or "—"],
         ["Km", str(vehicle.mileage or "—"), "N. flotta", getattr(vehicle, "fleet_number", None) or "—"],
@@ -165,7 +166,7 @@ def build_estimate_pdf(
         story.append(Paragraph(escape(" ".join(conditions)), styles["BodyText"]))
         story.append(Spacer(1, 4 * mm))
 
-    rows = [["Descrizione", "Q.tà", "Ricambi / materiali", "Ore", "Manodopera", "IVA", "Totale"]]
+    rows = [["Descrizione", "Q.tà", "Ricambi / mat.", "Ore", "Manodopera", "IVA", "Imponibile", "Totale"]]
     for line in lines:
         amounts = price_line(line, terms)
         hours = line.labor_hours + line.paint_hours
@@ -176,9 +177,10 @@ def build_estimate_pdf(
             f"{hours:g}",
             "Inclusa" if terms.labor_included and hours else euro(amounts.labor),
             f"{line.vat_rate:g}%",
+            euro(amounts.subtotal),
             euro(amounts.total),
         ])
-    table = Table(rows, repeatRows=1, colWidths=[62 * mm, 12 * mm, 26 * mm, 12 * mm, 22 * mm, 12 * mm, 22 * mm])
+    table = Table(rows, repeatRows=1, colWidths=[52 * mm, 10 * mm, 23 * mm, 10 * mm, 22 * mm, 11 * mm, 25 * mm, 25 * mm])
     style = _grid_style()
     style.add("ALIGN", (1, 1), (-1, -1), "RIGHT")
     table.setStyle(style)

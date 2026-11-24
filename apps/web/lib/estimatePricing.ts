@@ -13,6 +13,7 @@ export type PricedFields = {
   category: string;
   quantity: string;
   unit_price: string;
+  markup_percent?: string;
   discount_percent: string;
   labor_hours: string;
   labor_rate: string;
@@ -38,7 +39,9 @@ export function money(value: number) {
 export function priceLine(line: PricedFields, terms: PricingTerms | null | undefined): LineAmounts {
   const discount = num(line.discount_percent) / 100;
   const markup = num(terms?.parts_markup_percent) / 100;
-  let parts = num(line.quantity) * num(line.unit_price) * (1 - discount);
+  // Workshop markup on the part cost (internal: the customer only sees the resulting price).
+  const costMarkup = num(line.markup_percent) / 100;
+  let parts = num(line.quantity) * num(line.unit_price) * (1 + costMarkup) * (1 - discount);
   parts = (parts + num(line.materials)) * (1 + markup);
   let labor = num(line.labor_hours) * num(line.labor_rate) + num(line.paint_hours) * num(line.paint_rate);
   labor = terms?.labor_included ? 0 : labor * (1 - num(terms?.labor_discount_percent) / 100);

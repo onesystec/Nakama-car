@@ -29,7 +29,8 @@ from app.services import staff
 from app.services.audit import record_audit
 from app.services.contracts import customer_display_name, find_active_contract
 from app.services.numbering import next_number
-from app.services.pdf import build_estimate_pdf
+from app.services.company import company_lines, company_profile
+from app.services.pdf import build_estimate_pdf, customer_name as pdf_customer_name
 from app.services.pricing import PUBLIC_TERMS, PricingTerms, money, price_line
 from app.services.workshop import open_work_order
 
@@ -364,6 +365,7 @@ def add_estimate_line(
             "description": line.description,
             "quantity": str(line.quantity),
             "unit_price": str(line.unit_price),
+            "markup_percent": str(line.markup_percent),
             "labor_hours": str(line.labor_hours),
             "labor_rate": str(line.labor_rate),
             "paint_hours": str(line.paint_hours),
@@ -432,6 +434,7 @@ def update_estimate_line(
         "description": line.description,
         "quantity": str(line.quantity),
         "unit_price": str(line.unit_price),
+        "markup_percent": str(line.markup_percent),
         "discount_percent": str(line.discount_percent),
         "labor_hours": str(line.labor_hours),
         "labor_rate": str(line.labor_rate),
@@ -460,6 +463,7 @@ def update_estimate_line(
             "description": line.description,
             "quantity": str(line.quantity),
             "unit_price": str(line.unit_price),
+            "markup_percent": str(line.markup_percent),
             "discount_percent": str(line.discount_percent),
             "labor_hours": str(line.labor_hours),
             "labor_rate": str(line.labor_rate),
@@ -514,47 +518,57 @@ def delete_estimate_line(
     return None
 
 
-@router.get("/estimates/{estimate_id}/pdf")
-def estimate_pdf(
-    estimate_id: UUID,
-    db: Session = Depends(get_db),
-    auth: AuthContext = Depends(estimate_reader),
-):
-    estimate = get_tenant_estimate(db, auth.tenant_id, estimate_id)
+def estimate_document(db: Session, tenant_id: UUID, estimate_id: UUID) -> dict:
+    """Everything printed on the estimate: the PDF and the preview show the same data."""
+    estimate = get_tenant_estimate(db, tenant_id, estimate_id)
     case = db.scalar(
         select(RepairCase).where(
             RepairCase.id == estimate.repair_case_id,
-            RepairCase.tenant_id == auth.tenant_id,
+            RepairCase.tenant_id == tenant_id,
         )
     )
     if case is None:
         raise HTTPException(status_code=404, detail="Repair case not found")
 
     customer = db.scalar(
-        select(Customer).where(Customer.id == case.customer_id, Customer.tenant_id == auth.tenant_id)
+        select(Customer).where(Customer.id == case.customer_id, Customer.tenant_id == tenant_id)
     )
     vehicle = db.scalar(
-        select(Vehicle).where(Vehicle.id == case.vehicle_id, Vehicle.tenant_id == auth.tenant_id)
+        select(Vehicle).where(Vehicle.id == case.vehicle_id, Vehicle.tenant_id == tenant_id)
     )
     if customer is None or vehicle is None:
         raise HTTPException(status_code=404, detail="Customer or vehicle not found")
 
     lines = db.scalars(
         select(EstimateLine)
-        .where(EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == auth.tenant_id)
+        .where(EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == tenant_id)
         .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
-    settings = db.scalar(select(TenantSettings).where(TenantSettings.tenant_id == auth.tenant_id))
+    settings = db.scalar(select(TenantSettings).where(TenantSettings.tenant_id == tenant_id))
     contract = db.get(ServiceContract, estimate.contract_id) if estimate.contract_id else None
+    return {
+        "estimate": estimate,
+        "lines": lines,
+        "customer": customer,
+        "vehicle": vehicle,
+        "settings": settings,
+        "terms": terms_of(estimate),
+        "contract_name": contract.name if contract and contract.tenant_id == tenant_id else None,
+    }
+
+
+@router.get("/estimates/{estimate_id}/pdf")
+def estimate_pdf(
+    estimate_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(estimate_reader),
+):
+    document = estimate_document(db, auth.tenant_id, estimate_id)
+    estimate = document["estimate"]
+    settings = document["settings"]
     pdf = build_estimate_pdf(
-        estimate=estimate,
-        lines=lines,
-        customer=customer,
-        vehicle=vehicle,
         company_name=(settings.company_name if settings and settings.company_name else "NAKAMA CAR"),
-        settings=settings,
-        terms=terms_of(estimate),
-        contract_name=contract.name if contract and contract.tenant_id == auth.tenant_id else None,
+        **document,
     )
 
     filename = f"{estimate.estimate_number}.pdf"
@@ -563,3 +577,62 @@ def estimate_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
+
+
+@router.get("/estimates/{estimate_id}/preview")
+def estimate_preview(
+    estimate_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(estimate_reader),
+):
+    """The estimate as the customer sees it, for the print / WhatsApp preview (no costs or markups)."""
+    document = estimate_document(db, auth.tenant_id, estimate_id)
+    estimate, customer, vehicle, terms = document["estimate"], document["customer"], document["vehicle"], document["terms"]
+    settings = document["settings"]
+    lines = []
+    for line in document["lines"]:
+        amounts = price_line(line, terms)
+        hours = line.labor_hours + line.paint_hours
+        lines.append({
+            "description": line.description,
+            "quantity": str(line.quantity),
+            "parts": str(amounts.parts),
+            "hours": str(hours),
+            "labor": str(amounts.labor),
+            "labor_included": bool(terms.labor_included and hours),
+            "vat_rate": str(line.vat_rate),
+            "total": str(amounts.total),
+        })
+    return {
+        "company": company_lines_payload(settings),
+        "estimate_number": estimate.estimate_number,
+        "version": estimate.version,
+        "status": estimate.status.value,
+        "created_at": estimate.created_at.isoformat() if estimate.created_at else None,
+        "validity_days": getattr(settings, "estimate_validity_days", None) or 15,
+        "customer": {
+            "name": pdf_customer_name(customer),
+            "phone": getattr(customer, "phone", None),
+            "email": getattr(customer, "email", None),
+        },
+        "vehicle": {
+            "plate": vehicle.license_plate,
+            "description": " ".join(filter(None, [vehicle.make, vehicle.model, vehicle.version])) or None,
+            "vin": vehicle.vin,
+            "mileage": vehicle.mileage,
+            "fleet_number": getattr(vehicle, "fleet_number", None),
+        },
+        "contract_name": document["contract_name"],
+        "labor_included": terms.labor_included,
+        "labor_discount_percent": str(terms.labor_discount_percent),
+        "parts_markup_percent": str(terms.parts_markup_percent),
+        "lines": lines,
+        "subtotal": str(estimate.subtotal),
+        "vat_total": str(estimate.vat_total),
+        "total": str(estimate.total),
+    }
+
+
+def company_lines_payload(settings) -> dict:
+    profile = company_profile(settings)
+    return {"name": profile["company_name"], "lines": company_lines(profile)}

@@ -82,3 +82,45 @@ def test_estimate_lines_keep_the_order_chosen_in_the_editor(client):
     assert [line["description"] for line in c.get(f"{base}/lines").json()] == ["C", "A", "B", "D"]
     assert c.put(f"{base}/line-order", json={"line_ids": [ids[0], ids[1]]}).status_code == 422
     assert c.put(f"{base}/line-order", json={"line_ids": [ids[0], ids[0], ids[1], ids[2]]}).status_code == 422
+
+
+def test_markup_on_part_cost_raises_the_price_but_is_not_shown_to_the_customer(client):
+    import test_fleet_billing as fleet
+
+    c, _, _ = client
+    _, _, _, case = fleet.create_fleet_case(c, plate="RC123AR")
+    estimate = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    base = f"/api/v1/estimates/{estimate['id']}"
+    assert c.patch(f"{base}/pricing", json={"apply_contract": False}).status_code == 200  # public price list
+    line = c.post(f"{base}/lines", json={
+        "category": "PART", "description": "Radiatore", "quantity": 2, "unit_price": 100,
+        "markup_percent": 30, "discount_percent": 10, "vat_rate": 22,
+    }).json()
+    # 2 × 100 € cost, +30% markup, −10% discount = 234 € + 22% VAT.
+    assert Decimal(line["line_total"]) == Decimal("285.48")
+    assert Decimal(line["markup_percent"]) == Decimal("30")
+
+    preview = c.get(f"{base}/preview").json()
+    assert preview["lines"][0]["parts"] == "234.00"
+    assert "markup_percent" not in preview["lines"][0] and "unit_price" not in preview["lines"][0]
+    assert preview["company"]["name"]
+    assert any("Codice SDI" in text for text in preview["company"]["lines"])
+    pdf = c.get(f"{base}/pdf")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+
+def test_company_details_fall_back_to_nakama_car():
+    from types import SimpleNamespace
+
+    from app.services.company import company_lines, company_profile
+
+    profile = company_profile(None)
+    assert profile["company_name"] == "NAKAMA CAR SRLS"
+    assert company_lines(profile) == [
+        "Via A. Manzoni 58",
+        "20900 Monza (MB)",
+        "P.IVA 14361530968 · Codice SDI T9K4ZHO",
+    ]
+    custom = company_profile(SimpleNamespace(company_name="Officina Rossi", address="", vat_number="123", phone="02 1234"))
+    assert custom["company_name"] == "Officina Rossi" and custom["vat_number"] == "123"
+    assert custom["address"] == "Via A. Manzoni 58" and custom["phone"] == "02 1234"
