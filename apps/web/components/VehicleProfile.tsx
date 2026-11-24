@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useLanguage } from "./LanguageProvider";
 import { apiError, apiFetch, hasPermission } from "../lib/api";
 import { VehicleFront } from "./VehicleFront";
+import { TechnicalSheet } from "./TechnicalSheet";
 import { deleteVehiclesWithConfirm } from "../lib/vehicleDeletion";
 
 type Task = { description: string; status: string; note?: string | null; completed_at?: string | null };
@@ -191,6 +192,8 @@ export function VehicleProfile({ vehicleId, onClose, onChanged }: { vehicleId: s
                 )}
               </section>
             </div>
+
+            <TechnicalSheet key={profile.license_plate} plate={profile.license_plate} />
 
             <section className="vehicle-history">
               <div className="vehicle-history-head">
