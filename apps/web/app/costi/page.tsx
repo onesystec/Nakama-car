@@ -180,13 +180,13 @@ export default function CostiPage() {
                   <div className="data-table costs-parts head"><span>{t("Data")}</span><span>{t("Ricambio")}</span><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Q.tà")}</span><span>{t("Costo unit.")}</span><span>{t("Costo")}</span></div>
                   {parts.length === 0 ? <div className="empty-state">{t("Nessun ricambio nel periodo.")}</div> : parts.map((row) => (
                     <div className="data-table costs-parts" key={row.id}>
-                      <span>{formatDate(row.date)}</span>
-                      <span><strong>{row.description}</strong><small>{row.oem_code ? `OEM ${row.oem_code}` : t("Senza codice")}</small></span>
-                      <span>{row.case_number}<small className="plate-text">{row.plate}</small></span>
-                      <span><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
-                      <span>{n(row.quantity).toLocaleString("it-IT")}</span>
-                      <span>{formatMoney(row.unit_cost)}</span>
-                      <strong>{formatMoney(row.total_cost)}</strong>
+                      <span className="c-date">{formatDate(row.date)}</span>
+                      <span className="c-main"><strong>{row.description}</strong><small>{row.oem_code ? `OEM ${row.oem_code}` : t("Senza codice")}<i className="mobile-only"> · {formatDate(row.date)}</i></small></span>
+                      <span className="c-ref">{row.case_number}<small className="plate-text">{row.plate}</small></span>
+                      <span className="c-area"><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
+                      <span className="c-x">{n(row.quantity).toLocaleString("it-IT")}</span>
+                      <span className="c-sub"><i className="mobile-only">{n(row.quantity).toLocaleString("it-IT")} × </i>{formatMoney(row.unit_cost)}</span>
+                      <strong className="c-amount">{formatMoney(row.total_cost)}</strong>
                     </div>
                   ))}
                 </div>
@@ -198,13 +198,13 @@ export default function CostiPage() {
                   <div className="data-table costs-hours head"><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Stato")}</span><span>{t("Manodopera")}</span><span>{t("Vernice")}</span><span>{t("Totale ore")}</span><span>{t("Valore")}</span></div>
                   {hourRows.length === 0 ? <div className="empty-state">{t("Nessuna ora nel periodo.")}</div> : hourRows.map((row) => (
                     <div className="data-table costs-hours" key={row.case_id}>
-                      <span><strong>{row.case_number}</strong><small className="plate-text">{row.plate}</small></span>
-                      <span><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
-                      <span>{t(statusLabel[row.status] || row.status)}<small>{formatDate(row.date)}</small></span>
-                      <span>{hours(row.labor_hours)}</span>
-                      <span>{n(row.paint_hours) ? hours(row.paint_hours) : "—"}</span>
-                      <strong>{hours(n(row.labor_hours) + n(row.paint_hours))}</strong>
-                      <span>{formatMoney(row.labor_value)}</span>
+                      <span className="c-main"><strong>{row.case_number}</strong><small className="plate-text">{row.plate}</small></span>
+                      <span className="c-area"><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
+                      <span className="c-date">{t(statusLabel[row.status] || row.status)}<small>{formatDate(row.date)}</small></span>
+                      <span className="c-ref">{hours(row.labor_hours)}</span>
+                      <span className="c-x">{n(row.paint_hours) ? hours(row.paint_hours) : "—"}</span>
+                      <strong className="c-amount">{hours(n(row.labor_hours) + n(row.paint_hours))}</strong>
+                      <span className="c-sub">{formatMoney(row.labor_value)}</span>
                     </div>
                   ))}
                 </div>
@@ -216,12 +216,12 @@ export default function CostiPage() {
                   <div className="data-table costs-other head"><span>{t("Data")}</span><span>{t("Voce")}</span><span>{t("Tipo")}</span><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Importo")}</span></div>
                   {others.length === 0 ? <div className="empty-state">{t("Nessun altro costo nel periodo.")}</div> : others.map((row) => (
                     <div className="data-table costs-other" key={row.id}>
-                      <span>{formatDate(row.date)}</span>
-                      <span><strong>{row.description}</strong></span>
-                      <span>{t(otherLabel[row.category] || row.category)}</span>
-                      <span>{row.case_number}<small className="plate-text">{row.plate}</small></span>
-                      <span><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
-                      <strong>{formatMoney(row.amount)}</strong>
+                      <span className="c-date">{formatDate(row.date)}</span>
+                      <span className="c-main"><strong>{row.description}</strong><small className="mobile-only">{formatDate(row.date)}</small></span>
+                      <span className="c-sub">{t(otherLabel[row.category] || row.category)}</span>
+                      <span className="c-ref">{row.case_number}<small className="plate-text">{row.plate}</small></span>
+                      <span className="c-area"><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
+                      <strong className="c-amount">{formatMoney(row.amount)}</strong>
                     </div>
                   ))}
                 </div>
@@ -235,11 +235,11 @@ export default function CostiPage() {
                     <div className="data-table costs-expenses head"><span>{t("Data")}</span><span>{t("Descrizione")}</span><span>{t("Categoria")}</span><span>{t("Reparto")}</span><span>{t("Importo")}</span></div>
                     {expenses.length === 0 ? <div className="empty-state">{t("Nessuna spesa nel periodo.")}</div> : expenses.map((row) => (
                       <div className="data-table costs-expenses" key={row.id}>
-                        <span>{formatDate(row.date)}</span>
-                        <span><strong>{row.description}</strong>{row.supplier && <small>{row.supplier}</small>}</span>
-                        <span>{t(expenseLabel[row.category] || row.category)}</span>
-                        <span><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
-                        <strong>{formatMoney(row.amount)}</strong>
+                        <span className="c-date">{formatDate(row.date)}</span>
+                        <span className="c-main"><strong>{row.description}</strong><small>{row.supplier}<i className="mobile-only">{row.supplier ? " · " : ""}{formatDate(row.date)}</i></small></span>
+                        <span className="c-ref">{t(expenseLabel[row.category] || row.category)}</span>
+                        <span className="c-area"><em className={`area-pill area-${row.area.toLowerCase()}`}>{t(areaLabel[row.area])}</em></span>
+                        <strong className="c-amount">{formatMoney(row.amount)}</strong>
                       </div>
                     ))}
                   </div>

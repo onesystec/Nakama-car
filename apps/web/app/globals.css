@@ -2417,10 +2417,6 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
   .costs-compare { grid-template-columns: 1fr; }
   .costs-toolbar { align-items: stretch; }
   .costs-area { width: 100%; } .costs-area button { flex: 1; padding: 9px 6px; }
-  .data-table[class*="costs-"].head { display: none; }
-  .data-table.costs-parts, .data-table.costs-hours, .data-table.costs-other, .data-table.costs-expenses { grid-template-columns: 1fr auto; gap: 4px 10px; }
-  .data-table[class*="costs-"] > :nth-child(n+3):not(strong):not(:last-child) { display: none; }
-  .data-table[class*="costs-"] > span:first-child { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
   .costs-expense-form { grid-template-columns: 1fr; }
 }
 .costs-page { padding-bottom: 80px; }
@@ -2431,7 +2427,35 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
   .costs-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
   .costs-tabs button { flex: none; }
 }
+
+/* Costi officina on phones: one wide row per item. Name and amount on top, details on a second line. */
+.costs-page .mobile-only { display: none; font-style: normal; }
 @media (max-width: 900px) {
-  .data-table.costs-parts, .data-table.costs-hours, .data-table.costs-other, .data-table.costs-expenses { grid-template-columns: minmax(0,1fr) auto !important; }
-  .data-table[class*="costs-"] > strong:last-child { align-self: center; font-size: 13px; }
+  .costs-page .data-table[class*="costs-"].head { display: none; }
+  .costs-page .data-table[class*="costs-"]:not(.head) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+    grid-template-areas: "main main main amount" "ref ref area sub";
+    gap: 6px 12px; padding: 12px 14px; align-items: center; font-size: 12px;
+  }
+  .costs-page .data-table > .c-main { grid-area: main; font-size: 14px; }
+  .costs-page .data-table > .c-main strong { white-space: normal; }
+  .costs-page .data-table > .c-main small { display: inline; margin-left: 8px; }
+  .costs-page .data-table > .c-amount { grid-area: amount; text-align: right; white-space: nowrap; font-size: 15px; color: var(--nakama-navy); }
+  .costs-page .data-table > .c-date { grid-area: date; color: var(--muted); font-size: 12px; }
+  .costs-page .data-table > .c-date small { display: inline; margin-left: 4px; }
+  .costs-page .data-table > .c-ref { grid-area: ref; font-size: 12px; }
+  .costs-page .data-table > .c-ref small { display: inline; margin-left: 6px; }
+  .costs-page .data-table > .c-area { grid-area: area; }
+  .costs-page .data-table > .c-sub { grid-area: sub; text-align: right; color: var(--muted); font-size: 12px; }
+  .costs-page .data-table > :is(.c-date, .c-ref, .c-area, .c-sub) { white-space: nowrap; }
+  .costs-page .data-table > .c-ref { overflow: hidden; text-overflow: ellipsis; }
+  .costs-page .data-table > .c-x, .costs-page .data-table > .c-date { display: none; }
+  .costs-page .data-table.costs-hours:not(.head) { grid-template-areas: "main main main amount" "date date area sub"; }
+  .costs-page .data-table.costs-hours > .c-date { display: block; }
+  .costs-page .data-table.costs-hours > .c-ref { display: none; }
+  .costs-page .mobile-only { display: inline; }
+}
+@media (max-width: 420px) {
+  .costs-page .data-table[class*="costs-"]:not(.head) { gap: 5px 8px; padding: 11px 12px; }
+  .costs-page .data-table > .c-main small { display: block; margin: 2px 0 0; }
 }
