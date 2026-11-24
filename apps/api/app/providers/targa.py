@@ -5,6 +5,7 @@ The service is an ASP.NET ASMX web service; the HTTP GET binding of the
 holds the vehicle data as JSON. One credit is charged per successful lookup.
 """
 import json
+import logging
 import re
 import urllib.error
 import urllib.parse
@@ -15,9 +16,43 @@ from app.providers.contracts import ProviderVehicle, VehicleDataProvider
 
 PROVIDER_NAME = "targa.co.it"
 
+logger = logging.getLogger(__name__)
+
+# Messages shown to the workshop (Italian, like the rest of the app).
+REASON_MESSAGES = {
+    "no_credit": "Crediti esauriti sul servizio targhe (targa.co.it): ricarica il conto per riattivare la ricerca.",
+    "account": "Account del servizio targhe non valido: controlla il nome utente configurato (TARGA_API_USERNAME).",
+    "plate_failed": "Il servizio targhe non ha dati per questa targa (succede spesso con camion, rimorchi e mezzi pesanti): inserisci i dati a mano.",
+    "unreachable": "Il servizio targhe non risponde: riprova tra qualche minuto.",
+    "error": "Il servizio targhe ha restituito un errore: riprova più tardi.",
+}
+
 
 class PlateLookupError(RuntimeError):
     """The provider could not answer (credentials, credit, network)."""
+
+    def __init__(self, message: str, reason: str = "error"):
+        super().__init__(message)
+        self.reason = reason
+
+    @property
+    def user_message(self) -> str:
+        return REASON_MESSAGES.get(self.reason, REASON_MESSAGES["error"])
+
+
+def classify_error(detail: str) -> str | None:
+    """Reason code for an ASMX error body, None when the plate simply was not found."""
+    text = detail.lower()
+    if "no vehicle" in text or "not found" in text or "invalid registration" in text:
+        return None
+    if "lookup failed" in text:
+        # RegCheck answers "Italian lookup failed" for plates outside its car register.
+        return "plate_failed"
+    if "credit" in text or "balance" in text:
+        return "no_credit"
+    if "username" in text or "authori" in text or "blocked" in text:
+        return "account"
+    return "error"
 
 
 def _text(value) -> str | None:
@@ -144,17 +179,17 @@ class TargaVehicleDataProvider(VehicleDataProvider):
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = response.read()
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:500].lower()
+            detail = exc.read().decode("utf-8", "replace")[:500]
             # ASMX returns 500 with the exception text: "No vehicle found" for unknown plates.
-            if "no vehicle" in detail or "not found" in detail or "invalid registration" in detail:
+            reason = classify_error(detail)
+            if reason is None:
                 return None
-            if "credit" in detail:
-                raise PlateLookupError("No credits left on the plate lookup account") from exc
-            if "username" in detail or "authori" in detail or "blocked" in detail:
-                raise PlateLookupError("Plate lookup account not valid") from exc
-            raise PlateLookupError(f"Plate lookup service error ({exc.code})") from exc
+            # Keep the provider's own words in the logs: the UI only gets a short reason.
+            logger.warning("targa.co.it lookup failed (HTTP %s, %s): %s", exc.code, reason, " ".join(detail.split())[:300])
+            raise PlateLookupError(f"Plate lookup service error ({exc.code})", reason) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
-            raise PlateLookupError("Plate lookup service not reachable") from exc
+            logger.warning("targa.co.it not reachable: %s", exc)
+            raise PlateLookupError("Plate lookup service not reachable", "unreachable") from exc
         return parse_response(license_plate, body)
 
 

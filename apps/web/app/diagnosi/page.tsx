@@ -205,7 +205,7 @@ export default function DiagnosiPage() {
       setPlateSearch("new");
       if (response.status === 404) { setPlateNote("Targa non trovata nella banca dati: inserisci marca e modello a mano."); return; }
       if (response.status === 429) { setPlateNote("Limite mensile di ricerche targa raggiunto: inserisci i dati a mano."); return; }
-      if (!response.ok) { setPlateNote("Servizio targhe non disponibile: inserisci i dati a mano."); return; }
+      if (!response.ok) { setPlateNote(`${await apiError(response, "Servizio targhe non disponibile.")} Intanto inserisci i dati a mano.`); return; }
       const found: PlateData = await response.json();
       if (!isCurrent()) return;
       setPlateData(found);

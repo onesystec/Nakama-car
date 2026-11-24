@@ -145,7 +145,7 @@ def resolve_plate_data(db: Session, tenant_id: UUID, license_plate: str, *, cach
     try:
         vehicle = provider.find_by_plate(plate, "IT")
     except targa.PlateLookupError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=exc.user_message) from exc
 
     payload = None
     if vehicle is not None:
