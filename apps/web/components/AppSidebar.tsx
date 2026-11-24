@@ -19,6 +19,7 @@ const navigation = [
   ["/pratiche", "▤ Pratiche", "folder", "case.read"],
   ["/officina", "⚒ Il mio lavoro", "wrench", "work_order.read"],
   ["/fatture", "◫ Fatture", "invoice", "invoice.read"],
+  ["/costi", "▥ Costi officina", "costs", "invoice.create"],
   ["/clienti", "◎ Clienti", "clients", "customer.read"],
   ["/veicoli", "◇ Veicoli", "car", "vehicle.read"],
   ["/personale", "♙ Personale", "people", "users.manage"],
