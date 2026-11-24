@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
@@ -320,7 +320,7 @@ def list_estimate_lines(
     lines = db.scalars(
         select(EstimateLine)
         .where(EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == auth.tenant_id)
-        .order_by(EstimateLine.created_at, EstimateLine.id)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
     return [line_read(line, terms) for line in lines]
 
@@ -337,12 +337,18 @@ def add_estimate_line(
         raise HTTPException(status_code=409, detail="Approved estimates cannot be edited")
 
     subtotal, vat, total = calculate_line(payload, terms_of(estimate))
+    last_position = db.scalar(
+        select(func.max(EstimateLine.position)).where(
+            EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == auth.tenant_id
+        )
+    )
     line = EstimateLine(
         tenant_id=auth.tenant_id,
         estimate_id=estimate_id,
         line_subtotal=subtotal,
         line_vat=vat,
         line_total=total,
+        position=(last_position or 0) + 1,
         **payload.model_dump(),
     )
     db.add(line)
@@ -370,6 +376,34 @@ def add_estimate_line(
     db.commit()
     db.refresh(line)
     return line_read(line, terms_of(estimate))
+
+
+class LineOrder(BaseModel):
+    line_ids: list[UUID]
+
+
+@router.put("/estimates/{estimate_id}/line-order", status_code=status.HTTP_204_NO_CONTENT)
+def reorder_estimate_lines(
+    estimate_id: UUID,
+    payload: LineOrder,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_permission("estimate.create")),
+):
+    """Save the order of the lines, as arranged in the editor with the up/down arrows."""
+    estimate = get_tenant_estimate(db, auth.tenant_id, estimate_id)
+    if estimate.status == EstimateStatus.APPROVED:
+        raise HTTPException(status_code=409, detail="Approved estimates cannot be edited")
+    lines = {
+        line.id: line
+        for line in db.scalars(
+            select(EstimateLine).where(EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == auth.tenant_id)
+        ).all()
+    }
+    if len(set(payload.line_ids)) != len(payload.line_ids) or set(payload.line_ids) != set(lines):
+        raise HTTPException(status_code=422, detail="The order must list every line of the estimate once")
+    for position, line_id in enumerate(payload.line_ids, start=1):
+        lines[line_id].position = position
+    db.commit()
 
 
 @router.put("/estimates/{estimate_id}/lines/{line_id}", response_model=EstimateLineRead)
@@ -508,7 +542,7 @@ def estimate_pdf(
     lines = db.scalars(
         select(EstimateLine)
         .where(EstimateLine.estimate_id == estimate_id, EstimateLine.tenant_id == auth.tenant_id)
-        .order_by(EstimateLine.created_at)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
     settings = db.scalar(select(TenantSettings).where(TenantSettings.tenant_id == auth.tenant_id))
     contract = db.get(ServiceContract, estimate.contract_id) if estimate.contract_id else None

@@ -56,7 +56,7 @@ ITEM_BODY, ITEM_MECHANICAL = "ITEM_BODY", "ITEM_MECHANICAL"
 def estimate_lines(db: Session, estimate: Estimate) -> list[EstimateLine]:
     return list(db.scalars(
         select(EstimateLine).where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == estimate.tenant_id)
-        .order_by(EstimateLine.created_at)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all())
 
 

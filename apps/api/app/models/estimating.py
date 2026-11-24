@@ -2,7 +2,7 @@ import enum
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, false, ForeignKey, Numeric, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Enum, false, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantOwnedMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -105,3 +105,5 @@ class EstimateLine(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     line_subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     line_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     line_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    # Order chosen in the estimate editor (0 = not set: then by creation time).
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

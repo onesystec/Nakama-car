@@ -302,7 +302,7 @@ def case_detail(db: Session, tenant_id, case: RepairCase) -> dict:
     estimates = db.scalars(select(Estimate).where(Estimate.repair_case_id == case.id, Estimate.tenant_id == tenant_id).order_by(Estimate.created_at)).all()
     estimate_items = []
     for estimate in estimates:
-        lines = db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == tenant_id).order_by(EstimateLine.created_at, EstimateLine.id)).all()
+        lines = db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == tenant_id).order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)).all()
         approval = db.scalar(select(EstimateApproval).where(EstimateApproval.estimate_id == estimate.id, EstimateApproval.tenant_id == tenant_id))
         estimate_items.append({
             **estimate_summary(estimate), "notes": estimate.notes, "lines": [estimate_line(line) for line in lines],
@@ -415,7 +415,7 @@ def list_estimates(db: Session, tenant_id, *, status: str | None, waiting: bool,
 
 
 def estimate_full(db: Session, tenant_id, estimate: Estimate) -> dict:
-    lines = db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == tenant_id).order_by(EstimateLine.created_at, EstimateLine.id)).all()
+    lines = db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == estimate.id, EstimateLine.tenant_id == tenant_id).order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)).all()
     case = db.scalar(select(RepairCase).where(RepairCase.id == estimate.repair_case_id, RepairCase.tenant_id == tenant_id))
     return {
         **estimate_summary(estimate), "notes": estimate.notes,

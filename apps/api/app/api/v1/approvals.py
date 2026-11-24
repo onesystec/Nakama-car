@@ -138,7 +138,7 @@ def public_estimate(token: str, db: Session = Depends(get_db)):
             EstimateLine.estimate_id == estimate.id,
             EstimateLine.tenant_id == approval.tenant_id,
         )
-        .order_by(EstimateLine.created_at)
+        .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
 
     customer_name = customer.company_name or f"{customer.first_name or ''} {customer.last_name or ''}".strip()
