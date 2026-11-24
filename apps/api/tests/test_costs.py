@@ -66,7 +66,7 @@ def test_costs_are_split_by_meccanica_and_carrozzeria(client):
     assert Decimal(data["general_expenses"]) == Decimal("1800.00")
     assert {p["description"] for p in data["parts"]} == {"Kit distribuzione", "Olio 5W30", "Paraurti"}
     assert {h["plate"]: h["area"] for h in data["hours"]} == {"GH482KL": "MECHANICAL", "FT219RX": "BODY"}
-    assert [e["supplier"] for e in data["expenses"]] == [None, "Blowtherm"]
+    assert sorted((e["description"], e["supplier"]) for e in data["expenses"]) == [("Affitto", None), ("Filtri forno", "Blowtherm")]
 
     # Another period shows nothing.
     empty = c.get("/api/v1/costs?from=2020-01-01&to=2020-01-31").json()
