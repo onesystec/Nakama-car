@@ -2358,3 +2358,80 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
   .estimate-sheet { box-shadow: none; padding: 0; max-width: none; border-radius: 0; }
   .sheet-lines th, .sheet-info dt, .sheet-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Costi officina: costs split by Meccanica / Carrozzeria. */
+.costs-page { --mecc: #1558a5; --carr: #d9822b; }
+.costs-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin: 18px 0 16px; }
+.costs-period { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.costs-period label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.costs-period input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; font: inherit; font-size: 13px; background: var(--panel, white); color: inherit; }
+.costs-area { display: inline-flex; border: 1px solid #dce5ed; border-radius: 10px; padding: 3px; background: #f3f6f9; gap: 2px; }
+.costs-area button { border: 0; background: transparent; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; color: var(--muted); cursor: pointer; }
+.costs-area button.active { background: white; color: var(--nakama-navy); box-shadow: 0 1px 4px rgba(11,42,74,.12); }
+.costs-area button.area-mechanical.active { color: var(--mecc); }
+.costs-area button.area-body.active { color: var(--carr); }
+.costs-kpis .kpi-card { text-align: left; font: inherit; cursor: pointer; }
+.costs-kpis .kpi-card:hover { border-color: #b9cbdc; }
+.costs-search input { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; margin-bottom: 12px; font: inherit; background: var(--panel, white); color: inherit; }
+.costs-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.costs-compare.single { grid-template-columns: 1fr; }
+.costs-area-card { border-top: 4px solid var(--mecc) !important; }
+.costs-area-card.area-body { border-top-color: var(--carr) !important; }
+.costs-area-card .panel-head h2 { font-size: 18px; }
+.costs-area-total { font-size: 26px; letter-spacing: -.03em; color: var(--nakama-navy); }
+.costs-breakdown { margin: 0; padding: 6px 20px 4px; }
+.costs-breakdown div { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px dashed #e4e9ef; font-size: 14px; }
+.costs-breakdown div:last-child { border-bottom: 0; }
+.costs-breakdown dt small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.costs-breakdown dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.costs-bar { display: flex; height: 10px; margin: 6px 20px 18px; border-radius: 6px; overflow: hidden; background: #eef2f6; gap: 2px; }
+.costs-bar i, .costs-legend i { display: block; }
+.seg-parts { background: #0b2a4a; } .seg-labor_value { background: #2f7fd8; } .seg-materials { background: #22a06b; }
+.seg-external { background: #8e5bd6; } .seg-other { background: #9aa5b1; } .seg-expenses { background: #e0475b; }
+.costs-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 10px 2px; }
+.costs-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.costs-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.costs-grand { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; align-items: center; padding: 16px 20px; margin-top: 14px; }
+.costs-grand span { font-weight: 700; font-size: 14px; }
+.costs-grand small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.costs-grand strong { font-size: 17px; text-align: right; font-variant-numeric: tabular-nums; }
+.costs-grand > div:nth-of-type(2) { border-top: 1px solid var(--line); padding-top: 10px; }
+.costs-grand-total { font-size: 24px !important; color: var(--nakama-navy); border-top: 1px solid var(--line); padding-top: 10px; }
+.costs-page .panel-head > strong { font-size: 18px; color: var(--nakama-navy); }
+.data-table.costs-parts { grid-template-columns: .7fr 2fr 1.1fr .9fr .4fr .8fr .8fr; font-size: 12px; }
+.data-table.costs-hours { grid-template-columns: 1.2fr .9fr 1fr .8fr .7fr .8fr .8fr; font-size: 12px; }
+.data-table.costs-other { grid-template-columns: .7fr 2fr 1fr 1.1fr .9fr .8fr; font-size: 12px; }
+.data-table.costs-expenses { grid-template-columns: .7fr 2.2fr 1.2fr .9fr .8fr; font-size: 12px; }
+.data-table.head[class*="costs-"] { font-size: 9px; }
+.plate-text { font-family: ui-monospace, Menlo, monospace; letter-spacing: .05em; font-weight: 700; color: var(--nakama-navy) !important; }
+.area-pill { font-style: normal; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #e8f0fb; color: var(--mecc); white-space: nowrap; }
+.area-pill.area-body { background: #fdf0e3; color: #b8651a; }
+.area-pill.area-general { background: #eef1f4; color: #5b6570; }
+.costs-expense-form { padding: 18px 20px; margin-bottom: 14px; }
+.costs-expense-form h2 { grid-column: 1 / -1; font-size: 16px; margin: 0; }
+.costs-expense-form .wide { grid-column: 1 / -1; }
+[data-theme="dark"] .costs-area { background: #10223a; border-color: #23405f; }
+[data-theme="dark"] .costs-area button.active { background: #1a3352; color: #e7eef7; }
+[data-theme="dark"] :is(.costs-area-total, .costs-grand-total, .costs-page .panel-head > strong, .plate-text) { color: #e7eef7 !important; }
+@media (max-width: 900px) {
+  .costs-compare { grid-template-columns: 1fr; }
+  .costs-toolbar { align-items: stretch; }
+  .costs-area { width: 100%; } .costs-area button { flex: 1; padding: 9px 6px; }
+  .data-table[class*="costs-"].head { display: none; }
+  .data-table.costs-parts, .data-table.costs-hours, .data-table.costs-other, .data-table.costs-expenses { grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .data-table[class*="costs-"] > :nth-child(n+3):not(strong):not(:last-child) { display: none; }
+  .data-table[class*="costs-"] > span:first-child { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+  .costs-expense-form { grid-template-columns: 1fr; }
+}
+.costs-page { padding-bottom: 80px; }
+.costs-kpis .kpi-card { min-width: 0; }
+@media (max-width: 600px) {
+  .costs-kpis .kpi-card { padding: 14px; min-height: 0; }
+  .costs-kpis .kpi-card strong { font-size: 22px; }
+  .costs-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .costs-tabs button { flex: none; }
+}
+@media (max-width: 900px) {
+  .data-table.costs-parts, .data-table.costs-hours, .data-table.costs-other, .data-table.costs-expenses { grid-template-columns: minmax(0,1fr) auto !important; }
+  .data-table[class*="costs-"] > strong:last-child { align-self: center; font-size: 13px; }
+}
