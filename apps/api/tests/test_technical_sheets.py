@@ -51,3 +51,82 @@ def test_sheet_needs_make_and_model(client):
     only_engine = c.put("/api/v1/technical-sheets/vehicle/XX123YY", json={"engine_code": "F1AE3481"})
     assert only_engine.status_code == 200 and only_engine.json()["vehicle"]["engine_code"] == "F1AE3481"
     assert c.get("/api/v1/technical-sheets/vehicle/ZZ000ZZ").status_code == 404
+
+
+def photo_b64():
+    import base64
+    import io
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", (2400, 1600), "white").save(out, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(out.getvalue()).decode()
+
+
+def test_libretto_reading_is_off_without_api_key(client, monkeypatch):
+    from app.core.config import get_settings
+
+    c, _, _ = client
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", None)
+    assert c.get("/api/v1/technical-sheets/libretto/status").json()["configured"] is False
+    refused = c.post("/api/v1/technical-sheets/libretto", json={"image": photo_b64()})
+    assert refused.status_code == 503 and "non configurata" in refused.json()["detail"]
+
+
+def test_libretto_values_are_returned_for_checking_not_saved(client, monkeypatch):
+    from app.core.config import get_settings
+    from app.services import libretto
+
+    c, _, _ = client
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+    monkeypatch.setattr(get_settings(), "libretto_monthly_limit", 2)
+    sent = []
+
+    def fake_read(jpeg):
+        sent.append(jpeg)
+        return {"license_plate": "XX123YY", "make": "FIAT", "model": "DUCATO", "vin": "ZFA25000001234567",
+                "engine_size": "2287", "power_kw": "103", "fuel_type": "GASOLIO", "engine_code": "F1AGL411",
+                "type_code": None, "registration_date": "12/03/2019"}
+
+    monkeypatch.setattr(libretto, "read_libretto", fake_read)
+    make_vehicle(c, "XX123YY")
+    read = c.post("/api/v1/technical-sheets/libretto", json={"image": photo_b64()})
+    assert read.status_code == 200, read.text
+    assert read.json()["values"]["vin"] == "ZFA25000001234567"
+    from PIL import Image
+    import io
+    assert max(Image.open(io.BytesIO(sent[0])).size) == libretto.MAX_SIDE  # downscaled before sending
+    assert c.get("/api/v1/technical-sheets/vehicle/XX123YY").json()["vehicle"]["vin"] is None  # nothing saved
+
+    # The workshop confirms: empty vehicle fields are filled, so the sheet gets a model.
+    saved = c.put("/api/v1/technical-sheets/vehicle/XX123YY", json={
+        "vin": "ZFA25000001234567", "engine_code": "F1AGL411", "make": "FIAT", "model": "DUCATO",
+        "engine_size": "2287", "power_kw": 103, "fuel_type": "GASOLIO"}).json()
+    assert saved["model_known"] is True and saved["vehicle"]["make"] == "FIAT"
+
+    # Values already on the vehicle (from the plate lookup) are not overwritten.
+    make_vehicle(c, "GA111BB", make="Fiat", model="Ducato")
+    kept = c.put("/api/v1/technical-sheets/vehicle/GA111BB", json={"make": "IVECO", "model": "DAILY"}).json()
+    assert kept["vehicle"]["make"] == "Fiat"
+
+    assert c.post("/api/v1/technical-sheets/libretto", json={"image": photo_b64()}).status_code == 200
+    limited = c.post("/api/v1/technical-sheets/libretto", json={"image": photo_b64()})
+    assert limited.status_code == 429
+
+
+def test_libretto_errors_reach_the_workshop(client, monkeypatch):
+    from app.core.config import get_settings
+    from app.services import libretto
+
+    c, _, _ = client
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+
+    def not_a_libretto(jpeg):
+        raise libretto.LibrettoError("La foto non sembra una carta di circolazione: inquadra il libretto aperto.", 422)
+
+    monkeypatch.setattr(libretto, "read_libretto", not_a_libretto)
+    answer = c.post("/api/v1/technical-sheets/libretto", json={"image": photo_b64()})
+    assert answer.status_code == 422 and "carta di circolazione" in answer.json()["detail"]
+    broken = c.post("/api/v1/technical-sheets/libretto", json={"image": "data:image/png;base64," + "A" * 200})
+    assert broken.status_code == 422

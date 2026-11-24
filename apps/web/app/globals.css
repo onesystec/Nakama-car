@@ -2311,3 +2311,7 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .technical-sheet-form label { display: grid; gap: 4px; font-size: 13px; }
 .vehicle-card-actions { display: flex; flex-direction: column; gap: 6px; margin-left: auto; align-self: flex-start; }
 .technical-sheet > button { justify-self: start; }
+.technical-sheet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.technical-sheet-actions .hint { margin: 0; }
+.technical-sheet-form label.from-libretto input { border-color: #d4a017; background: #fff8e1; }
+.technical-sheet-form label.from-libretto small { color: #8a6500; font-size: 12px; }

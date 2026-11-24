@@ -4,21 +4,26 @@ The sheet belongs to make + model + engine, not to one plate: the next vehicle o
 model already shows what the workshop wrote. Unknown values stay empty (the app shows
 "non disponibile"); the API never fills a value it was not given.
 """
+import base64
+import binascii
 import re
 import unicodedata
 from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.staff import find_vehicle
 from app.db.deps import get_db
 from app.models.garage import Vehicle
-from app.models.identity import User
+from app.api.v1.vehicles import month_start
+from app.core.config import get_settings
+from app.models.identity import AuditLog, User
 from app.models.technical import TechnicalSheet
 from app.security.context import AuthContext, require_any_permission
+from app.services import libretto
 from app.services.audit import record_audit
 
 router = APIRouter(prefix="/technical-sheets", tags=["technical-sheets"])
@@ -61,7 +66,18 @@ class SheetUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     vin: str | None = Field(default=None, max_length=32)
     engine_code: str | None = Field(default=None, max_length=40)
+    # From a libretto the workshop confirmed: only fill what the vehicle does not have yet.
+    make: str | None = Field(default=None, max_length=120)
+    model: str | None = Field(default=None, max_length=120)
+    fuel_type: str | None = Field(default=None, max_length=40)
+    engine_size: str | None = Field(default=None, max_length=20)
+    power_kw: int | None = Field(default=None, ge=1, le=2000)
     data: SheetData = Field(default_factory=SheetData)
+
+
+class LibrettoPhoto(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    image: str = Field(min_length=100, max_length=14_000_000)  # base64, with or without data: prefix
 
 
 def _norm(text: str | None) -> str:
@@ -158,6 +174,12 @@ def save_technical_sheet(
         if value != getattr(vehicle, field):
             changes[field] = {"old": getattr(vehicle, field), "new": value}
             setattr(vehicle, field, value)
+    for field in ("make", "model", "fuel_type", "engine_size", "power_kw"):
+        value = getattr(payload, field)
+        value = _clean(value) if isinstance(value, str) else value
+        if value is not None and getattr(vehicle, field) in (None, ""):
+            changes[field] = {"old": getattr(vehicle, field), "new": value}
+            setattr(vehicle, field, value)
     if changes:
         record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="vehicle", entity_id=vehicle.id,
                      action="technical_data_updated", old_value={k: v["old"] for k, v in changes.items()},
@@ -188,3 +210,51 @@ def save_technical_sheet(
     if sheet is not None:
         db.refresh(sheet)
     return sheet_payload(db, vehicle, sheet)
+
+
+def libretto_reads_this_month(db: Session, tenant_id) -> int:
+    return db.scalar(select(func.count(AuditLog.id)).where(
+        AuditLog.tenant_id == tenant_id, AuditLog.action == "libretto_read", AuditLog.created_at >= month_start(),
+    )) or 0
+
+
+@router.get("/libretto/status")
+def libretto_status(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_any_permission("vehicle.read", "work_order.read")),
+):
+    return {"configured": libretto.is_configured(), "used_this_month": libretto_reads_this_month(db, auth.tenant_id),
+            "monthly_limit": get_settings().libretto_monthly_limit}
+
+
+@router.post("/libretto")
+def read_libretto_photo(
+    payload: LibrettoPhoto,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_any_permission("vehicle.write", "work_order.update_status")),
+):
+    """Reads the photo of the libretto and returns the values for the workshop to check.
+    Nothing is saved here (the photo is not stored either)."""
+    if not libretto.is_configured():
+        raise HTTPException(status_code=503, detail="Lettura libretto non configurata: manca la chiave API.")
+    if libretto_reads_this_month(db, auth.tenant_id) >= get_settings().libretto_monthly_limit:
+        raise HTTPException(status_code=429, detail="Limite mensile di letture del libretto raggiunto.")
+    data = payload.image.split(",", 1)[1] if payload.image.startswith("data:") else payload.image
+    try:
+        raw = base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=422, detail="Il file non è una foto leggibile: usa JPG o PNG.")
+    try:
+        jpeg = libretto.prepare_image(raw)
+    except libretto.LibrettoError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.user_message)
+    try:
+        values = libretto.read_libretto(jpeg)
+    except libretto.LibrettoError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.user_message)
+    finally:
+        # Every call to the paid service counts, also the ones that read nothing.
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="vehicle", entity_id=None,
+                     action="libretto_read")
+        db.commit()
+    return {"values": values}

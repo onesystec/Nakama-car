@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     car_image_timeout_seconds: float = 30
     car_image_monthly_limit: int = 500
 
+    # Reading the photo of the libretto (carta di circolazione) with Claude. Empty key = button off.
+    anthropic_api_key: str | None = None
+    libretto_model: str = "claude-opus-5-5"
+    libretto_monthly_limit: int = 300
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
@@ -78,6 +83,7 @@ def strip_external_services(settings: "Settings") -> None:
     """A test copy is public and has a published demo login: it must not spend the real keys."""
     settings.targa_api_username = None
     settings.car_image_api_key = None
+    settings.anthropic_api_key = None
     settings.s3_bucket = settings.s3_access_key_id = settings.s3_secret_access_key = None
     settings.datev_tenants = {}
 
