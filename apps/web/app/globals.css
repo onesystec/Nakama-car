@@ -2533,3 +2533,4 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .job-mechanic { font-weight: 700; }
 .job-mechanic.free { color: var(--warning); }
 .job-mechanic.mine { color: var(--success); }
+.job-take:not(.taken) { border: 0; background: none; padding: 0; }

@@ -116,7 +116,6 @@ export default function OfficinaPage() {
     try {
       const response = await apiFetch(`/my-work/cases/${job.repair_case_id}/take`, { method: "POST" });
       if (!response.ok) setError(await apiError(response, "Impossibile prendere il lavoro."));
-      else setNotice(words("Lavoro registrato a tuo nome fino alla consegna.", "Trabajo registrado a tu nombre hasta la entrega."));
       await load();
     } finally { setBusy(null); }
   }
@@ -186,7 +185,7 @@ export default function OfficinaPage() {
         <small>{item.done}/{item.total} {t("completati")}</small>
         {item.mechanic_name
           ? <small className={`job-mechanic${item.mine ? " mine" : ""}`}>🔧 {item.mine ? words("Lo fai tu", "Lo haces tú") : item.mechanic_name}</small>
-          : <small className="job-mechanic free">✋ {words("Nessuno l'ha ancora preso", "Nadie lo ha cogido todavía")}</small>}
+          : <small className="job-mechanic free">✋ {words("Da prendere", "Por coger")}</small>}
       </button>
       {officeActions(item)}
       </div>
@@ -336,18 +335,13 @@ function JobDetail({ job, busy, onBack, onToggle, onSaveNote, actions, onTake }:
       {job.mechanic_name ? (
         <div className={`job-take taken${job.mine ? " mine" : ""}`}>
           <span aria-hidden>🔧</span>
-          <div><strong>{job.mine ? words("Questo lavoro lo fai tu", "Este trabajo lo haces tú") : words(`Questo lavoro lo fa ${job.mechanic_name}`, `Este trabajo lo hace ${job.mechanic_name}`)}</strong>
-          <small>{words("Resta registrato nella pratica fino alla consegna.", "Queda registrado en el expediente hasta la entrega.")}</small></div>
+          <div><strong>{job.mechanic_name}</strong></div>
         </div>
       ) : onTake ? (
         <div className="job-take">
-          <div><strong>{words("Guarda i ricambi e i lavori approvati di questo veicolo.", "Mira los recambios y trabajos aprobados de este vehículo.")}</strong>
-          <small>{words("Quando sei sicuro che questo lavoro lo fai tu, tocca «Realizza lavoro»: la pratica resta a tuo nome fino alla consegna.", "Cuando estés seguro de que este trabajo lo haces tú, toca «Realizza lavoro»: el expediente queda a tu nombre hasta la entrega.")}</small></div>
           <button type="button" className="primary" disabled={!!busy} onClick={onTake}>✋ {words("Realizza lavoro", "Realizar trabajo")}</button>
         </div>
-      ) : (
-        <div className="job-take"><div><strong>{words("Nessun meccanico ha ancora preso questo lavoro.", "Ningún mecánico ha cogido todavía este trabajo.")}</strong></div></div>
-      )}
+      ) : null}
 
       {job.request && <p className="job-request"><b>{t("Richiesta del cliente")}:</b> {job.request}</p>}
       {job.internal_notes && <p className="job-request"><b>{t("Note dell'ufficio")}:</b> {job.internal_notes}</p>}
