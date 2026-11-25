@@ -1732,6 +1732,16 @@ body:has(.modal-backdrop) .chat-bubble-fab, body:has(.modal-backdrop) .chat-bubb
 .staff-sheet dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
 .staff-sheet dt { font-size: 11px; color: var(--muted); }
 .staff-sheet dd { margin: 2px 0 0; font-size: 13px; }
+.staff-editor { display: grid; gap: 4px; }
+.staff-sheet .staff-editor .profile-form { padding: 8px 4px 16px; }
+.staff-documents { border-top: 1px solid var(--line); }
+.staff-document-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.staff-document { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.staff-document small { color: var(--muted); font-size: 12px; }
+.staff-document .record-delete { margin-left: auto; color: #b42318; }
+.staff-document-name { font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.status-chip.staff-expired { background: #fde8e7; color: #b42318; }
+.status-chip.staff-expiring { background: #fff4e0; color: #a2530c; }
 
 @media (max-width: 720px) {
   .profile-layout { grid-template-columns: 1fr; }

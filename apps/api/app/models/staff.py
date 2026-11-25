@@ -4,8 +4,8 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, String, Text, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, LargeBinary, Numeric, String, Text, Uuid
+from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from app.db.base import Base, TenantOwnedMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
@@ -18,16 +18,37 @@ class UserProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(32))
     birth_date: Mapped[date | None] = mapped_column(Date)
+    birth_place: Mapped[str | None] = mapped_column(String(120))
     tax_code: Mapped[str | None] = mapped_column(String(32))
     address: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(120))
     postal_code: Mapped[str | None] = mapped_column(String(16))
+    # Where the salary is paid (filled by the worker or by the office).
+    iban: Mapped[str | None] = mapped_column(String(34))
     emergency_contact: Mapped[str | None] = mapped_column(String(160))
     emergency_phone: Mapped[str | None] = mapped_column(String(32))
     skills: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
     # BODY (carrozzeria) / MECHANICAL (meccanica). Empty = from the role.
     work_area: Mapped[str | None] = mapped_column(String(12))
+
+
+class StaffDocument(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
+    """A personal document of a worker (ID card, driving licence, contract, certificate…).
+
+    Only the worker and the administration can see it.
+    """
+
+    __tablename__ = "staff_documents"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="OTHER")
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_on: Mapped[date | None] = mapped_column(Date)
+    uploaded_by: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    content: Mapped[bytes] = deferred(mapped_column(LargeBinary, nullable=False))
 
 
 class DiagnosisStatus(str, enum.Enum):

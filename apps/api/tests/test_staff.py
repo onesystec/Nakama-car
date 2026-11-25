@@ -27,8 +27,7 @@ def test_workers_area_profile_and_diagnosis_to_estimate(client):
     saved = mechanic.put("/api/v1/me/profile", json={"phone": " 345 111 2222 ", "city": "Milano", "birth_date": "1990-05-01", "skills": "Diagnosi elettronica"})
     assert saved.status_code == 200, saved.text
     assert saved.json()["profile"]["phone"] == "345 111 2222"
-    # Data minimisation: birth date, tax code and home address are no longer asked nor stored.
-    assert not {"birth_date", "tax_code", "address", "city", "postal_code"} & set(mechanic.get("/api/v1/me").json()["profile"])
+    assert saved.json()["profile"]["city"] == "Milano" and saved.json()["profile"]["birth_date"] == "1990-05-01"
     assert mechanic.get(f"/api/v1/users/{mechanic_user['id']}/profile").status_code == 403
     assert c.get(f"/api/v1/users/{mechanic_user['id']}/profile").json()["profile"]["skills"] == "Diagnosi elettronica"
     assert c.put(f"/api/v1/users/{mechanic_user['id']}/area", json={"work_area": "ALL"}).json()["work_area"] is None

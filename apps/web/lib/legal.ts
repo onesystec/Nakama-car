@@ -68,7 +68,7 @@ const it: Record<LegalDoc, Document> = {
         "Accettazione dei preventivi online: nome indicato come firma, eventuali note, data, ora, indirizzo IP e browser.",
         "Clienti con accesso al portale: richieste di manutenzione e installazione GPS ONE TRACK, nome del referente, email, password (protetta mediante hash Argon2) e messaggi scambiati con l'officina.",
         "Dati dai sistemi di bordo (solo per i clienti flotta che collegano la telematica): chilometri, anomalie e ultima posizione del veicolo. Il cliente flotta deve informare i propri autisti.",
-        "Personale dell'officina: nome, email, telefono, contatto di emergenza, ruolo, competenze e lavori assegnati.",
+        "Personale dell'officina: nome, email, telefono, contatto di emergenza, ruolo, competenze e lavori assegnati; se il lavoratore o l'amministrazione li inseriscono, anche data e luogo di nascita, codice fiscale, residenza, IBAN per lo stipendio e documenti personali (documento d'identità, patente, contratto, attestati). Questi dati e documenti li vedono solo il lavoratore e l'amministrazione, e ogni consultazione da parte dell'amministrazione resta registrata.",
         "Registro degli accessi: account, data e ora, esito, indirizzo IP, browser e tipo di app (web, Android, Mac).",
       ] },
       { title: "3. Perché li trattiamo e su quale base", items: [
@@ -166,7 +166,7 @@ const es: Record<LegalDoc, Document> = {
         "Aceptación de presupuestos online: nombre indicado como firma, notas, fecha, hora, dirección IP y navegador.",
         "Clientes con acceso al portal: solicitudes de mantenimiento e instalación GPS ONE TRACK, nombre del responsable, email, contraseña (guardada solo cifrada) y mensajes con el taller.",
         "Datos de los sistemas a bordo (solo clientes de flota que conectan la telemática): kilómetros, averías y última posición del vehículo. El cliente de flota debe informar a sus conductores.",
-        "Personal del taller: nombre, email, teléfono, contacto de emergencia, rol, competencias y trabajos asignados.",
+        "Personal del taller: nombre, email, teléfono, contacto de emergencia, rol, competencias y trabajos asignados; si el trabajador o la administración los introducen, también fecha y lugar de nacimiento, código fiscal, residencia, IBAN para el sueldo y documentos personales (documento de identidad, carné de conducir, contrato, certificados). Estos datos y documentos solo los ven el trabajador y la administración, y cada consulta de la administración queda registrada.",
         "Registro de accesos: cuenta, fecha y hora, resultado, dirección IP, navegador y tipo de app (web, Android, Mac).",
       ] },
       { title: "3. Para qué y con qué base legal", items: [

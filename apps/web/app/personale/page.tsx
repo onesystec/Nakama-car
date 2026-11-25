@@ -5,6 +5,7 @@ import { ItemIcon } from "../../components/ItemIcon";
 import { useLanguage } from "../../components/LanguageProvider";
 
 import { IssuedAccess, StaffAccessShare } from "../../components/StaffAccessShare";
+import { StaffProfileEditor } from "../../components/StaffProfileEditor";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { SectionShell } from "../../components/SectionShell";
@@ -12,9 +13,6 @@ import { apiError, apiFetch, getAccessToken, sessionUser } from "../../lib/api";
 
 type Worker = { id: string; email: string; first_name: string; last_name: string; status: string; role_codes: string[]; work_area?: string | null; must_change_password?: boolean; temporary_password?: string | null };
 type StaffProfile = { profile: Record<string, string | null> };
-const profileLabels: [string, string][] = [
-  ["phone", "Telefono"], ["emergency_contact", "Contatto di emergenza"], ["emergency_phone", "Telefono di emergenza"], ["skills", "Competenze"], ["notes", "Note"],
-];
 const profiles = [
   { code: "RECEPTION", name: "Accettazione", description: "Clienti, veicoli, pratiche e creazione preventivi." },
   { code: "BODYSHOP", name: "Carrozzeria", description: "Area carrozzeria: vede solo i veicoli e i lavori di carrozzeria, invia diagnosi e spunta i lavori fatti." },
@@ -74,7 +72,6 @@ export default function PersonalePage() {
     finally { setSaving(false); }
   }
   const [opened, setOpened] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<StaffProfile | null>(null);
   async function changeArea(user: Worker, area: string) {
     const response = await apiFetch(`/users/${user.id}/area`, { method: "PUT", body: JSON.stringify({ work_area: area }) });
     if (response.ok) {
@@ -82,11 +79,8 @@ export default function PersonalePage() {
       setUsers(previous => previous.map(item => item.id === user.id ? { ...item, work_area: data.work_area } : item));
     }
   }
-  async function openSheet(user: Worker) {
-    if (opened === user.id) { setOpened(null); return; }
-    setOpened(user.id); setSheet(null);
-    const response = await apiFetch(`/users/${user.id}/profile`);
-    if (response.ok) setSheet(await response.json());
+  function openSheet(user: Worker) {
+    setOpened(opened === user.id ? null : user.id);
   }
   /** New temporary password for the worker (the old one stops working), ready to send by WhatsApp, email or copy. */
   async function shareAccess(user: Worker) {
@@ -139,11 +133,11 @@ export default function PersonalePage() {
         {listError && <p className="auth-error" role="alert">{t(listError)}</p>}
         <div className="staff-list">{filtered.length === 0 ? <p className="empty-state">{t("Nessun lavoratore trovato.")}</p> : filtered.map(user => <article className="staff-row" key={user.id}><div><strong>{user.first_name} {user.last_name}</strong><p>{user.email}</p></div><span className="staff-role-list">{user.role_codes.map(code => <span className="staff-role" key={code}><ItemIcon name={code} /><span>{t(profiles.find(p => p.code === code)?.name || code)}</span></span>)}</span><span className={`status-chip${user.must_change_password ? " staff-pending" : ""}`}>{user.status !== "ACTIVE" ? (user.status === "DISABLED" ? t("Disabilitato") : t("Invitato")) : user.must_change_password ? t("Primo accesso in attesa") : t("Attivo")}</span>
           {isWorkshop(user) && <label className="staff-area">{t("Area")}<select value={user.work_area || "ALL"} onChange={e => changeArea(user, e.target.value)}><option value="MECHANICAL">{t("Meccanica")}</option><option value="BODY">{t("Carrozzeria")}</option><option value="ALL">{t("Entrambe")}</option></select></label>}
-          <button type="button" className="ghost" aria-expanded={opened === user.id} onClick={() => openSheet(user)}>{t("Scheda")}</button>
+          <button type="button" className="ghost" aria-expanded={opened === user.id} onClick={() => openSheet(user)}>{opened === user.id ? t("Chiudi scheda") : t("Scheda")}</button>
           {user.id !== me && user.status === "ACTIVE" && <button type="button" className="secondary" disabled={sharing === user.id} onClick={() => shareAccess(user)}>{sharing === user.id ? t("Preparazione…") : t("Invia accesso")}</button>}
           {user.id !== me && <button type="button" className="ghost record-delete" onClick={() => removeWorker(user)}>{t("Elimina")}</button>}
           {issued?.from === "list" && issued.id === user.id && <StaffAccessShare access={issued} onClose={() => setIssued(null)} />}
-          {opened === user.id && <div className="staff-sheet">{!sheet ? <p className="hint">{t("Caricamento…")}</p> : <dl>{profileLabels.map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{sheet.profile[key] || "—"}</dd></div>)}</dl>}</div>}
+          {opened === user.id && <div className="staff-sheet"><StaffProfileEditor base={`/users/${user.id}`} admin /></div>}
         </article>)}</div>
       </section>
     </>}
