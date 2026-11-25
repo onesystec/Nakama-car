@@ -26,7 +26,7 @@ from app.models.approval import EstimateApproval
 from app.models.billing import Invoice, InvoiceStatus
 from app.models.contracts import ServiceContract
 from app.models.estimating import Estimate, EstimateStatus
-from app.models.garage import Customer, CustomerType, RepairCase, Vehicle
+from app.models.garage import Customer, CustomerType, RepairCase, RepairCaseStatus, Vehicle
 from app.models.portal import PortalAccount, PortalServiceRequest
 from app.models.tracking import CaseMessage
 from app.security.context import AuthContext, require_permission
@@ -674,6 +674,83 @@ def portal_vehicle_detail(vehicle_id: UUID, db: Session = Depends(get_db), conte
             }
             for invoice in invoices
         ],
+    }
+
+
+# Cases the customer follows in the 3D workshop: still to repair or waiting on the estimate. Ready and closed ones stay out.
+SCENE_STATUSES = (
+    RepairCaseStatus.NEW, RepairCaseStatus.WAITING_APPROVAL, RepairCaseStatus.APPROVED, RepairCaseStatus.WAITING_PARTS,
+    RepairCaseStatus.IN_REPAIR, RepairCaseStatus.PAINTING, RepairCaseStatus.ASSEMBLY, RepairCaseStatus.QUALITY_CONTROL,
+)
+
+
+def portal_case_rows(db: Session, context: PortalContext, *statuses: RepairCaseStatus, limit: int = 300):
+    """The customer's own cases with their vehicle: both must belong to this customer and this workshop."""
+    query = (
+        select(RepairCase, Vehicle)
+        .join(Vehicle, Vehicle.id == RepairCase.vehicle_id)
+        .where(
+            RepairCase.tenant_id == context.tenant_id, RepairCase.customer_id == context.customer_id,
+            Vehicle.tenant_id == context.tenant_id, Vehicle.customer_id == context.customer_id,
+        )
+        .order_by(RepairCase.created_at.desc(), RepairCase.id.desc())
+        .limit(limit)
+    )
+    if statuses:
+        query = query.where(RepairCase.status.in_(statuses))
+    return db.execute(query).all()
+
+
+@router.get("/portal/cases")
+def portal_cases(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+    """Every case (pratica) of the customer's vehicles, newest first, with the estimate the customer can see."""
+    rows = portal_case_rows(db, context)
+    ids = [case.id for case, _ in rows]
+    estimates = {}
+    if ids:
+        for estimate in db.scalars(
+            select(Estimate).where(Estimate.tenant_id == context.tenant_id, Estimate.repair_case_id.in_(ids),
+                                   Estimate.status.in_(CUSTOMER_ESTIMATES))
+            .order_by(Estimate.created_at)
+        ).all():
+            estimates[estimate.repair_case_id] = estimate  # the newest one wins
+    result = []
+    for case, vehicle in rows:
+        estimate = estimates.get(case.id)
+        result.append({
+            "id": str(case.id),
+            "case_number": case.case_number,
+            "status": case.status.value,
+            "status_text": tracking.STATUS_TEXT[case.status],
+            "closed": tracking.is_closed(case),
+            "work_type": case.work_type,
+            "opened_at": case.created_at,
+            "updated_at": case.updated_at,
+            "mileage": case.mileage,
+            "vehicle_id": str(vehicle.id),
+            "license_plate": vehicle.license_plate,
+            "vehicle": " ".join(filter(None, [vehicle.make, vehicle.model])) or None,
+            "estimate": {
+                "estimate_number": estimate.estimate_number, "status": estimate.status.value, "total": str(estimate.total),
+            } if estimate else None,
+        })
+    return result
+
+
+@router.get("/portal/workshop-scene")
+def portal_workshop_scene(db: Session = Depends(get_db), context: PortalContext = Depends(get_portal_context)):
+    """The 3D workshop with only this customer's vehicles in repair or waiting on an estimate. No replay of the day:
+    the workshop's events also concern other customers."""
+    rows = portal_case_rows(db, context, *SCENE_STATUSES, limit=100)
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "positions_are_illustrative": True,
+        "vehicles": [{
+            "case_id": str(case.id), "vehicle_id": str(vehicle.id), "case_number": case.case_number,
+            "plate": vehicle.license_plate, "make": vehicle.make, "model": vehicle.model, "color": vehicle.color_name,
+            "category": vehicle.vehicle_category, "status": case.status.value, "initial_status": case.status.value,
+            "status_text": tracking.STATUS_TEXT[case.status], "created_at": case.created_at,
+        } for case, vehicle in rows],
     }
 
 

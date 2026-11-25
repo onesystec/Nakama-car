@@ -12,13 +12,15 @@ import { CustomerLogo } from "./CustomerLogo";
 import { PasswordInput } from "./PasswordInput";
 import { portalError, portalFetch, savePortalToken } from "../lib/portal";
 
-export type PortalSection = "fleet" | "shop" | "pickup" | "estimates" | "invoices" | "chat" | "add" | "profile";
+export type PortalSection = "fleet" | "shop" | "pickup" | "cases" | "workshop" | "estimates" | "invoices" | "chat" | "add" | "profile";
 
 // [section, label, icon]
 const sections: [PortalSection, string, string][] = [
   ["fleet", "Tutta la flotta", "truck"],
   ["shop", "In manutenzione o riparazione", "work"],
   ["pickup", "Da ritirare", "car"],
+  ["cases", "Pratiche", "folder"],
+  ["workshop", "Officina 3D", "wrench"],
   ["estimates", "Preventivi", "estimate"],
   ["invoices", "Fatture", "invoice"],
   ["chat", "Chat", "chat"],
@@ -110,6 +112,126 @@ export function PortalEstimates({ onOpenVehicle }: { onOpenVehicle: (id: string)
           {item.approval_path ? <a className="primary portal-doc-action" href={item.approval_path} target="_blank" rel="noreferrer">{t("Apri e approva")}</a> : <span />}
         </li>;
       })}
+    </ul>}
+  </section>;
+}
+
+type PortalCase = {
+  id: string; case_number: string; status: string; status_text: string; closed: boolean; work_type: string;
+  opened_at: string; updated_at: string; mileage?: number | null; vehicle_id: string; license_plate: string; vehicle?: string | null;
+  estimate: { estimate_number: string; status: string; total: string } | null;
+};
+
+/** Every pratica of the customer's own vehicles: open ones first, a click on the plate opens the vehicle's profile. */
+export function PortalCases({ onOpenVehicle }: { onOpenVehicle: (id: string) => void }) {
+  const { t } = useLanguage();
+  const [items, setItems] = useState<PortalCase[] | null>(null);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<"open" | "closed" | "all">("open");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    portalFetch("/portal/cases").then(async (response) => {
+      if (response.ok) setItems(await response.json());
+      else setError(await portalError(response, "Impossibile caricare le pratiche."));
+    }).catch(() => setError("Impossibile caricare le pratiche."));
+  }, []);
+  const squash = (value: string) => value.toUpperCase().replace(/[\s\-.]+/g, "");
+  const needle = squash(query.trim());
+  const open = (items || []).filter((item) => !item.closed).length;
+  const shown = (items || []).filter((item) => (filter === "all" || (filter === "open") === !item.closed)
+    && (!needle || [item.license_plate, item.case_number, item.vehicle || ""].some((value) => squash(value).includes(needle))));
+  return <section className="panel portal-section">
+    <h2>{t("Pratiche")}</h2>
+    <p className="hint">{t("Le pratiche dei tuoi veicoli in officina, in corso e chiuse.")}</p>
+    <div className="portal-case-filters" role="group" aria-label={t("Filtro")}>
+      {([["open", `${t("In corso")} (${open})`], ["closed", `${t("Chiuse")} (${(items || []).length - open})`], ["all", `${t("Tutte")} (${(items || []).length})`]] as const)
+        .map(([key, label]) => <button key={key} type="button" className={filter === key ? "active" : ""} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
+    </div>
+    <input className="portal-search" type="search" autoComplete="off" placeholder={t("Cerca targa o numero pratica")} value={query} onChange={(e) => setQuery(e.target.value)} />
+    {error && <p className="record-error" role="alert">{t(error)}</p>}
+    {items && shown.length === 0 && <p className="hint">{t(filter === "open" && !needle ? "Nessuna pratica in corso." : "Nessuna pratica trovata.")}</p>}
+    {shown.length > 0 && <ul className="portal-docs portal-cases">
+      {shown.map((item) => <li key={item.id}>
+        <button type="button" className="plate-chip" onClick={() => onOpenVehicle(item.vehicle_id)}>{item.license_plate}</button>
+        <div>
+          <strong>{t("Pratica")} {item.case_number}</strong>
+          <small>{[item.vehicle, `${t("aperta il")} ${day(item.opened_at)}`].filter(Boolean).join(" · ")}</small>
+          <span className="portal-status-text">{t(item.status_text)}</span>
+        </div>
+        <span className={`status-chip${item.closed ? "" : item.status === "READY" ? " ok tone-accepted" : " warn tone-pending"}`}>{t(item.closed ? "Chiusa" : item.status === "READY" ? "Da ritirare" : "In corso")}</span>
+        {item.estimate
+          ? <span className={`status-chip${item.estimate.status === "APPROVED" ? " ok tone-accepted" : item.estimate.status === "REJECTED" ? " tone-rejected" : item.estimate.status === "SENT" || item.estimate.status === "VIEWED" ? " warn tone-pending" : ""}`}>{t("Preventivo")} · {t(estimateStatus[item.estimate.status] || item.estimate.status)}</span>
+          : <span />}
+        <button type="button" className="ghost portal-doc-action" onClick={() => onOpenVehicle(item.vehicle_id)}>{t("Apri veicolo")}</button>
+      </li>)}
+    </ul>}
+  </section>;
+}
+
+type SceneVehicle = { case_id: string; vehicle_id: string; case_number: string; plate: string; make?: string | null; model?: string | null; status: string; status_text: string };
+
+/** The 3D workshop with only the customer's own vehicles in repair or waiting on an estimate. */
+export function PortalWorkshop3D({ onOpenVehicle }: { onOpenVehicle: (id: string) => void }) {
+  const { t, language } = useLanguage();
+  const frame = useRef<HTMLIFrameElement>(null);
+  const ready = useRef(false);
+  const latest = useRef<SceneVehicle[] | null>(null);
+  const shown = useRef("");
+  const lang = useRef(language);
+  lang.current = language;
+  const [vehicles, setVehicles] = useState<SceneVehicle[] | null>(null);
+  const [error, setError] = useState("");
+  const send = useCallback((list: SceneVehicle[], animate: boolean) => {
+    if (!ready.current) return;
+    frame.current?.contentWindow?.postMessage({ type: "nakama-scene-snapshot", vehicles: list, animate, lang: lang.current }, window.location.origin);
+    shown.current = JSON.stringify(list);
+  }, []);
+  useEffect(() => {
+    if (ready.current) frame.current?.contentWindow?.postMessage({ type: "nakama-scene-lang", lang: language }, window.location.origin);
+  }, [language]);
+  useEffect(() => {
+    const message = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
+      if (event.data?.type === "nakama-scene-ready") { ready.current = true; if (latest.current) send(latest.current, false); }
+    };
+    window.addEventListener("message", message);
+    return () => window.removeEventListener("message", message);
+  }, [send]);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      if (document.hidden) return;
+      try {
+        const response = await portalFetch("/portal/workshop-scene");
+        if (!alive) return;
+        if (!response.ok) { setError(await portalError(response, "Impossibile caricare la vista 3D.")); return; }
+        const data: { vehicles: SceneVehicle[] } = await response.json();
+        if (!alive) return;
+        setError("");
+        latest.current = data.vehicles;
+        setVehicles(data.vehicles);
+        if (JSON.stringify(data.vehicles) !== shown.current) send(data.vehicles, Boolean(shown.current));
+      } catch { if (alive) setError("Impossibile caricare la vista 3D."); }
+    };
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [send]);
+  return <section className="panel portal-section">
+    <h2>{t("Officina 3D")}</h2>
+    <p className="hint">{t("Qui vedi solo i tuoi veicoli in riparazione o in attesa di preventivo. Le postazioni sono illustrative, non la posizione reale.")}</p>
+    {error && <p className="record-error" role="alert">{t(error)}</p>}
+    {vehicles && vehicles.length === 0 && <p className="hint">{t("Nessun tuo veicolo in officina in questo momento.")}</p>}
+    <iframe ref={frame} src="/workshop-3d/index.html" title={t("Vista 3D dell'officina")} className="portal-workshop-frame" hidden={vehicles?.length === 0} />
+    {vehicles && vehicles.length > 0 && <ul className="portal-docs portal-scene-list">
+      {vehicles.map((item) => <li key={item.case_id}>
+        <button type="button" className="plate-chip" onClick={() => onOpenVehicle(item.vehicle_id)}>{item.plate}</button>
+        <div>
+          <strong>{[item.make, item.model].filter(Boolean).join(" ") || t("Veicolo")}</strong>
+          <small>{t("Pratica")} {item.case_number}</small>
+        </div>
+        <span className={`status-chip${item.status === "WAITING_APPROVAL" ? " warn tone-pending" : ""}`}>{t(item.status_text)}</span>
+      </li>)}
     </ul>}
   </section>;
 }
