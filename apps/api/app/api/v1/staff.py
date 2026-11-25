@@ -577,6 +577,7 @@ def write_diagnosis(db: Session, auth: AuthContext, diagnosis: Diagnosis, payloa
     diagnosis.vehicle_id = vehicle.id if vehicle else (case.vehicle_id if case else None)
     diagnosis.repair_case_id = case.id if case else None
     diagnosis.work_type = work_type
+    staff.claim_case(db, case, diagnosis.created_by)  # the worker who opens the job stays on it
     diagnosis.mileage = payload.mileage
     diagnosis.fuel_level = payload.fuel_level
     if case is not None:
@@ -707,6 +708,7 @@ def diagnosis_to_estimate(
         db.add(case)
         db.flush()
     diagnosis.repair_case_id = case.id
+    staff.claim_case(db, case, diagnosis.created_by)  # the worker who made the diagnosis opened the job
     attach_photos_to_case(db, diagnosis, case.id)
 
     estimate = Estimate(
@@ -979,6 +981,8 @@ def toggle_task(task_id: UUID, payload: TaskToggle, db: Session = Depends(get_db
     old = task.status.value
     if payload.done:
         task.status, task.completed_by, task.completed_at = WorkTaskStatus.DONE, auth.user_id, datetime.now(timezone.utc)
+        # A job opened without a diagnosis gets the first worker who does something on it.
+        staff.claim_case(db, db.scalar(select(RepairCase).join(WorkOrder, WorkOrder.repair_case_id == RepairCase.id).where(WorkOrder.id == task.work_order_id)), auth.user_id)
     else:
         task.status, task.completed_by, task.completed_at = WorkTaskStatus.PENDING, None, None
     record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="work_task", entity_id=task.id,

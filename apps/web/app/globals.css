@@ -2508,3 +2508,16 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .draft-restored button { color: #8a5a00; }
 [data-theme="dark"] .draft-restored { background: #3a2d0a; border-color: #8a6a1a; color: #ffe3a3; }
 [data-theme="dark"] .draft-restored button { color: #ffd479; }
+
+/* Worker who opened the pratica: stays on it to the end of the job. */
+.case-mechanic { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--soft); }
+.case-mechanic-icon { font-size: 22px; line-height: 1; }
+.case-mechanic-body { display: flex; flex-direction: column; gap: 1px; flex: 1 1 200px; min-width: 0; }
+.case-mechanic-body small { color: var(--muted); font-size: 12px; }
+.case-mechanic-body > small:first-child { text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.case-mechanic-body strong { font-size: 17px; }
+.case-mechanic-body em { color: var(--muted); font-size: 14px; }
+.case-mechanic-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1 1 100%; }
+.case-mechanic-edit select { flex: 1 1 200px; min-width: 0; }
+.case-mechanic-error { flex: 1 1 100%; margin: 0; color: var(--danger); }
+.case-row-mechanic { display: inline-block; margin-left: 8px; white-space: nowrap; font-weight: 600; color: var(--ink); }

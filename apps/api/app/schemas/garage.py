@@ -82,6 +82,10 @@ class RepairCaseRead(RepairCaseCreate):
     id: UUID
     case_number: str
     status: RepairCaseStatus
+    # Workshop worker who opened the job and keeps it to the end.
+    mechanic_id: UUID | None = None
+    mechanic_assigned_at: datetime | None = None
+    mechanic_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -100,6 +104,13 @@ class RepairCaseListItem(BaseModel):
     customer_name: str
     mileage: int | None = None
     estimate_status: str | None = None
+    mechanic_id: UUID | None = None
+    mechanic_name: str | None = None
+
+
+class CaseMechanicUpdate(BaseModel):
+    # None takes the worker off the case (it gets the next one who works on it).
+    mechanic_id: UUID | None = None
 
 
 class CustomerUpdate(BaseModel):
