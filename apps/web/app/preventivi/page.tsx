@@ -105,6 +105,30 @@ function mergeLines(current: Line[], loaded: Line[], saved: Record<string, strin
   return merged;
 }
 
+// Unsaved rows are also kept in this browser: if the session ends or the page reloads, they come back.
+const DRAFT_DAYS = 7;
+type Draft = { at: number; lines: Line[]; saved: Record<string, string> };
+const draftKey = (id: string) => `nakama_estimate_draft_${id}`;
+
+function readDraft(id: string): Draft | null {
+  try {
+    const draft = JSON.parse(localStorage.getItem(draftKey(id)) || "null") as Draft | null;
+    if (!draft || !Array.isArray(draft.lines) || Date.now() - draft.at > DRAFT_DAYS * 86400000) return null;
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(id: string, draft: Draft | null) {
+  try {
+    if (draft) localStorage.setItem(draftKey(id), JSON.stringify(draft));
+    else localStorage.removeItem(draftKey(id));
+  } catch {
+    // Storage full or blocked: the editor still works, only without the safety copy.
+  }
+}
+
 function linePayload(line: Line) {
   const payload: Record<string, string | number> = { category: line.category, description: line.description.trim() };
   for (const field of numericFields) payload[field] = Number(line[field] || 0);
@@ -273,9 +297,12 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
   const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
   // Same as savedSignatures, readable inside state updaters after an await.
   const savedRef = useRef<Record<string, string>>({});
+  // The first load puts back the unsaved rows kept in this browser, if any.
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [restored, setRestored] = useState(0);
 
   /** Read the estimate again. Unsaved edits in the other rows are kept; `fresh` rows take the saved values. */
-  async function reload(fresh: string[] = []) {
+  async function reload(fresh: string[] = [], discard = false) {
     const [estimateResponse, linesResponse] = await Promise.all([apiFetch(`/estimates/${id}`), apiFetch(`/estimates/${id}/lines`)]);
     if (!estimateResponse.ok || !linesResponse.ok) {
       setError(t("Preventivo non trovato."));
@@ -286,7 +313,15 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
     const loaded = data.map((line) => Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value === null ? "" : String(value)])) as unknown as Line);
     const previous = savedRef.current;
     const freshIds = new Set(fresh);
-    setLines((current) => mergeLines(current, loaded, previous, freshIds));
+    const draft = !loadedOnce ? readDraft(id) : null;
+    if (discard) setLines(loaded);
+    else if (draft) {
+      const merged = mergeLines(draft.lines, loaded, draft.saved, freshIds);
+      const kept = merged.filter((line) => !line.id || draft.saved[line.id] !== lineSignature(line)).length;
+      setLines(merged);
+      setRestored(kept);
+    } else setLines((current) => mergeLines(current, loaded, previous, freshIds));
+    setLoadedOnce(true);
     const signatures = Object.fromEntries(loaded.map((line) => [line.id, lineSignature(line)]));
     savedRef.current = signatures;
     setSavedSignatures(signatures);
@@ -304,6 +339,12 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
 
   const locked = !estimate || estimate.status === "APPROVED";
 
+  async function discardDraft() {
+    writeDraft(id, null);
+    setRestored(0);
+    await reload([], true);
+  }
+
   // Totals follow every keystroke: each line is priced here with the same rules as the server.
   const priced = lines.map((line) => ({
     amounts: priceLine(line, estimate),
@@ -315,6 +356,15 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
   const liveTotal = money(liveSubtotal + liveVat);
   const unpricedCount = priced.filter((row) => row.missing.size > 0).length;
   const dirtyCount = locked ? 0 : priced.filter((row) => row.dirty).length;
+
+  // Keep the unsaved rows in this browser while they exist; forget them once everything is saved.
+  useEffect(() => {
+    if (!loadedOnce || !estimate) return;
+    if (dirtyCount === 0) {
+      writeDraft(id, null);
+      if (restored) setRestored(0);
+    } else writeDraft(id, { at: Date.now(), lines, saved: savedSignatures });
+  }, [lines, savedSignatures, loadedOnce, estimate, dirtyCount]);
 
   function update(index: number, patch: Partial<Line>) {
     setLines((previous) => previous.map((line, position) => {
@@ -428,7 +478,7 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
   }
 
   return (
-    <section ref={panelRef} className="panel record-editor estimate-editor" aria-label={t("Preventivo")}>
+    <section ref={panelRef} className="panel record-editor estimate-editor" aria-label={t("Preventivo")} data-unsaved={dirtyCount > 0 ? "" : undefined}>
       <div className="panel-head">
         <div>
           <h2 className="estimate-title">
@@ -451,6 +501,12 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
         </div>
       </div>
       {error && <div className="record-error" role="alert">{error}</div>}
+      {restored > 0 && dirtyCount > 0 && (
+        <div className="draft-restored" role="status">
+          <span>{restored === 1 ? t("Ripristinata 1 riga non salvata dall’ultima volta.") : t("Ripristinate {n} righe non salvate dall’ultima volta.").replace("{n}", String(restored))} {t("Controlla e premi Salva tutto.")}</span>
+          <button type="button" className="ghost" onClick={discardDraft}>{t("Scarta queste modifiche")}</button>
+        </div>
+      )}
       {estimate && (
         <div className={`pricing-banner${estimate.contract_id ? " contract" : ""}`}>
           {estimate.contract_id ? (

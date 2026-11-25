@@ -16,7 +16,7 @@ from app.models.identity import (
     UserTenant,
 )
 from app.schemas.auth import BootstrapRequest, LegalAcceptance, LoginRequest, LoginResponse, PasswordChange
-from app.security.context import AuthContext, get_auth_session
+from app.security.context import AuthContext, get_auth_context, get_auth_session
 from app.security.passwords import hash_password, verify_password
 from app.security.tokens import create_access_token
 from app.services import access
@@ -146,6 +146,14 @@ def change_password(payload: PasswordChange, request: Request, db: Session = Dep
     access.record_access(db, request, tenant_id=auth.tenant_id, user_id=user.id, email=user.email, event="PASSWORD_CHANGED")
     db.commit()
     db.refresh(user)
+    return login_response(db, user, auth.tenant_id)
+
+
+@router.post("/auth/refresh", response_model=LoginResponse)
+def refresh_session(db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
+    """A new token for a session that is still valid, so someone working in the app is not logged out
+    in the middle of an estimate. An expired or revoked token gets 401 as usual (idle sessions still end)."""
+    user = db.get(User, auth.user_id)
     return login_response(db, user, auth.tenant_id)
 
 
