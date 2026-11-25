@@ -13,7 +13,7 @@ import type { PlateSpots } from "../../lib/plateSpots";
 import { FleetProfile, Job, JobItem } from "../../components/FleetProfile";
 import { VehicleServiceRequests } from "../../components/ServiceRequests";
 import { CustomerLogo } from "../../components/CustomerLogo";
-import { openInvoicePdf, PortalAddVehicle, PortalChat, PortalEstimates, PortalInvoices, PortalProfile, PortalSection, PortalSidebar } from "../../components/PortalSections";
+import { openInvoicePdf, PortalAddVehicle, PortalCases, PortalChat, PortalEstimates, PortalInvoices, PortalProfile, PortalSection, PortalSidebar, PortalWorkshop3D } from "../../components/PortalSections";
 import { clearPortalToken, getPortalToken, portalError, portalFetch, savePortalToken } from "../../lib/portal";
 
 type Maintenance = {
@@ -421,6 +421,10 @@ export default function PortalPage() {
               {(section === "shop" ? inRepair : toPickUp).length === 0 && <p className="hint">{t(section === "shop" ? "Nessun veicolo in officina in questo momento." : "Nessun veicolo da ritirare.")}</p>}
             </div>
           </section>
+        ) : section === "cases" ? (
+          <PortalCases onOpenVehicle={openVehicle} />
+        ) : section === "workshop" ? (
+          <PortalWorkshop3D onOpenVehicle={openVehicle} />
         ) : section === "estimates" ? (
           <PortalEstimates onOpenVehicle={openVehicle} />
         ) : section === "invoices" ? (

@@ -382,3 +382,47 @@ def test_portal_excel_import_uses_plate_data_and_leaves_mileage_blank(client, mo
     assert vehicles["AB123CD"]["mileage"] is None
     assert vehicles["EF456GH"]["mileage"] is None
     assert portal.post(path, params={"filename": "fleet.csv", "preview": "false"}, content=file).json()["created"] == 0
+
+
+def test_portal_cases_and_workshop_scene_show_only_own_vehicles(client):
+    c, _, _ = client
+    customer, _, vehicle, case = fleet.create_fleet_case(c)
+    portal = portal_client(c, customer)
+
+    # A second vehicle of the same customer, already ready for pickup: listed among the cases, not in the 3D workshop.
+    ready_vehicle = c.post("/api/v1/vehicles", json={"license_plate": "RD456YY", "customer_id": customer["id"]}).json()
+    ready_case = c.post("/api/v1/cases", json={"customer_id": customer["id"], "vehicle_id": ready_vehicle["id"]}).json()
+    order = tracking_tests.open_work_order(c, ready_case)
+    assert c.patch(f"/api/v1/work-orders/{order['id']}/status", json={"status": "READY"}).status_code == 200
+
+    # Another customer of the workshop, with a car in repair: never visible.
+    other = c.post("/api/v1/customers", json={"first_name": "Mario", "last_name": "Rossi"}).json()
+    other_vehicle = c.post("/api/v1/vehicles", json={"license_plate": "ZZ999ZZ", "customer_id": other["id"]}).json()
+    other_case = c.post("/api/v1/cases", json={"customer_id": other["id"], "vehicle_id": other_vehicle["id"]}).json()
+    other_order = tracking_tests.open_work_order(c, other_case)
+    c.patch(f"/api/v1/work-orders/{other_order['id']}/status", json={"status": "IN_REPAIR"})
+
+    cases = portal.get("/api/v1/portal/cases")
+    assert cases.status_code == 200, cases.text
+    numbers = {item["case_number"]: item for item in cases.json()}
+    assert set(numbers) == {case["case_number"], ready_case["case_number"]}
+    assert numbers[case["case_number"]]["license_plate"] == "FL123TR"
+    assert numbers[case["case_number"]]["status_text"] == "Veicolo accettato in officina"
+    assert numbers[ready_case["case_number"]]["status"] == "READY"
+    assert numbers[ready_case["case_number"]]["estimate"]["status"] == "APPROVED"
+
+    scene = portal.get("/api/v1/portal/workshop-scene")
+    assert scene.status_code == 200, scene.text
+    plates = [item["plate"] for item in scene.json()["vehicles"]]
+    assert plates == ["FL123TR"]
+    assert "events" not in scene.json()
+
+    # Once in repair it stays in the scene; delivered, it leaves.
+    first_order = tracking_tests.open_work_order(c, case)
+    c.patch(f"/api/v1/work-orders/{first_order['id']}/status", json={"status": "IN_REPAIR"})
+    assert [item["status"] for item in portal.get("/api/v1/portal/workshop-scene").json()["vehicles"]] == ["IN_REPAIR"]
+
+    # Workshop staff tokens do not open the portal endpoints, nor the other way round.
+    assert c.get("/api/v1/portal/cases").status_code == 401
+    assert c.get("/api/v1/portal/workshop-scene").status_code == 401
+    assert portal.get("/api/v1/workshop-scene").status_code == 401
