@@ -22,6 +22,8 @@ type Job = {
   work_order_id: string; work_order_number: string; status: string; priority: string; case_number: string; repair_case_id: string; work_type: string;
   plate: string; vehicle: string | null; color: string | null; customer_name: string; request: string | null; internal_notes: string | null;
   details: Details; tasks: Task[]; done: number; total: number; is_new: boolean; approved_at: string;
+  // Who pressed «Realizza lavoro» on this case (stays to the end of the job).
+  mechanic_id: string | null; mechanic_name: string | null; mine: boolean;
 };
 type Waiting = { repair_case_id: string; case_number: string; plate: string; vehicle: string | null; request: string | null; work_type: string; mileage: number | null };
 type Pending = Waiting & { stage: "OFFICE" | "CUSTOMER" | "REJECTED"; estimate_number: string };
@@ -107,6 +109,17 @@ export default function OfficinaPage() {
     } finally { setBusy(null); }
   }
 
+  // «Realizza lavoro»: the worker, sure the job is theirs, puts their name on the case until the end.
+  async function take(job: Job) {
+    if (busy) return;
+    setBusy(`take-${job.repair_case_id}`); setError("");
+    try {
+      const response = await apiFetch(`/my-work/cases/${job.repair_case_id}/take`, { method: "POST" });
+      if (!response.ok) setError(await apiError(response, "Impossibile prendere il lavoro."));
+      await load();
+    } finally { setBusy(null); }
+  }
+
   async function saveNote(job: Job, task: Task, note: string) {
     const response = await apiFetch(`/my-work/tasks/${task.id}/note`, { method: "PUT", body: JSON.stringify({ note }) });
     if (!response.ok) { setError(await apiError(response, "Impossibile salvare la nota.")); return false; }
@@ -170,6 +183,9 @@ export default function OfficinaPage() {
         {item.request && <small className="job-req">{item.request}</small>}
         <span className="job-progress"><span style={{ width: `${item.total ? (item.done / item.total) * 100 : 0}%` }} /></span>
         <small>{item.done}/{item.total} {t("completati")}</small>
+        {item.mechanic_name
+          ? <small className={`job-mechanic${item.mine ? " mine" : ""}`}>🔧 {item.mine ? words("Lo fai tu", "Lo haces tú") : item.mechanic_name}</small>
+          : <small className="job-mechanic free">✋ {words("Da prendere", "Por coger")}</small>}
       </button>
       {officeActions(item)}
       </div>
@@ -186,13 +202,12 @@ export default function OfficinaPage() {
       {error && <div className="record-error" role="alert">{t(error)}</div>}
       {notice && <p role="status">{notice}</p>}
       {!data ? <div className="empty-state">{t("Caricamento…")}</div> : job ? (
-        <JobDetail job={job} busy={busy} onBack={() => open(null)} onToggle={toggle} onSaveNote={saveNote} actions={officeActions(job)} />
+        <JobDetail job={job} busy={busy} onBack={() => open(null)} onToggle={toggle} onSaveNote={saveNote} actions={officeActions(job)} onTake={isManager ? undefined : () => take(job)} />
       ) : (
         <>
           {data.new_jobs > 0 && (
             <div className="new-jobs-banner" role="status">
               <strong>🔔 {data.new_jobs === 1 ? t("1 lavoro nuovo approvato dal cliente") : t("{n} lavori nuovi approvati dal cliente").replace("{n}", String(data.new_jobs))}</strong>
-              <span>{allAreas ? t("In attesa che il meccanico o il carrozziere inizi.") : t("Puoi iniziare: aprilo e tocca ogni lavoro quando lo finisci.")}</span>
             </div>
           )}
           {allAreas ? areaOrder.map((area) => {
@@ -201,19 +216,18 @@ export default function OfficinaPage() {
               <section key={area} className="panel">
                 <div className="panel-head"><div>
                   <h2>{area === "BODY" ? "🚗" : "🔧"} {t(area === "BODY" ? "Lavori in carrozzeria" : "Lavori in meccanica")} · {jobs.length}</h2>
-                  <p>{t("Veicoli approvati dal cliente e lo stato di ogni lavoro.")}</p>
                 </div></div>
                 {jobs.length === 0 ? <div className="empty-state">{t("Nessun lavoro in corso.")}</div> : <div className="job-grid">{jobs.map(card)}</div>}
               </section>
             );
           }) : (
             <section className="panel">
-              <div className="panel-head"><div><h2>{t("Lavori da fare")} · {data.jobs.length}</h2><p>{t("Veicoli approvati dal cliente. Apri un veicolo per vedere i lavori da fare.")}</p></div></div>
+              <div className="panel-head"><div><h2>{t("Lavori da fare")} · {data.jobs.length}</h2></div></div>
               {data.jobs.length === 0 ? <div className="empty-state">{t("Nessun veicolo in lavorazione nella tua area.")}</div> : <div className="job-grid">{data.jobs.map(card)}</div>}
             </section>
           )}
           <section className="panel">
-            <div className="panel-head"><div><h2>{t("In attesa di diagnosi")} · {data.waiting.length}</h2><p>{t("Veicoli arrivati che aspettano la diagnosi per il preventivo.")}</p></div></div>
+            <div className="panel-head"><div><h2>{t("In attesa di diagnosi")} · {data.waiting.length}</h2></div></div>
             {data.waiting.length === 0 ? <div className="empty-state">{t("Nessun veicolo in attesa.")}</div> : (
               <div className="job-grid">
                 {data.waiting.map((item) => (
@@ -230,7 +244,7 @@ export default function OfficinaPage() {
           </section>
           {data.pending.length > 0 && (
             <section className="panel">
-              <div className="panel-head"><div><h2>{t("In ufficio o dal cliente")} · {data.pending.length}</h2><p>{t("Diagnosi già inviate: appena il cliente approva, il veicolo passa in «Lavori da fare».")}</p></div></div>
+              <div className="panel-head"><div><h2>{t("In ufficio o dal cliente")} · {data.pending.length}</h2></div></div>
               <div className="job-grid">
                 {data.pending.map((item) => (
                   <div key={item.repair_case_id} className={`job-card pending stage-${item.stage.toLowerCase()}`}>
@@ -254,12 +268,13 @@ export default function OfficinaPage() {
 }
 
 /** One vehicle: the whole car with its damages/parts, its data, and every job as a button with a note. */
-function JobDetail({ job, busy, onBack, onToggle, onSaveNote, actions }: {
-  job: Job; busy: string | null; onBack: () => void; actions?: ReactNode;
+function JobDetail({ job, busy, onBack, onToggle, onSaveNote, actions, onTake }: {
+  job: Job; busy: string | null; onBack: () => void; actions?: ReactNode; onTake?: () => void;
   onToggle: (job: Job, task: Task) => void;
   onSaveNote: (job: Job, task: Task, note: string) => Promise<boolean>;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const words = (it: string, es: string) => language === "es" ? es : it;
   const [markers, setMarkers] = useState<DamageMarker[]>([]);
   const [parts, setParts] = useState<{ id: string; label: string }[]>([]);
   const caseId = job.repair_case_id;
@@ -315,13 +330,24 @@ function JobDetail({ job, busy, onBack, onToggle, onSaveNote, actions }: {
         </dl>
       </div>
 
+      {job.mechanic_name ? (
+        <div className={`job-take taken${job.mine ? " mine" : ""}`}>
+          <span aria-hidden>🔧</span>
+          <div><strong>{job.mechanic_name}</strong></div>
+        </div>
+      ) : onTake ? (
+        <div className="job-take">
+          <button type="button" className="primary" disabled={!!busy} onClick={onTake}>✋ {words("Realizza lavoro", "Realizar trabajo")}</button>
+        </div>
+      ) : null}
+
       {job.request && <p className="job-request"><b>{t("Richiesta del cliente")}:</b> {job.request}</p>}
       {job.internal_notes && <p className="job-request"><b>{t("Note dell'ufficio")}:</b> {job.internal_notes}</p>}
 
       <div className="job-progress" aria-label={`${job.done}/${job.total}`}>
         <span style={{ width: `${job.total ? (job.done / job.total) * 100 : 0}%` }} />
       </div>
-      <p className="hint">{job.done}/{job.total} {t("completati")} · {t("Tocca un lavoro quando lo finisci; toccalo di nuovo se ti sei sbagliato. Con 💬 aggiungi una nota.")}</p>
+      <p className="hint">{job.done}/{job.total} {t("completati")}</p>
 
       {items.length > 0 && (
         <>

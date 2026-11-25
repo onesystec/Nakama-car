@@ -11,7 +11,8 @@ from app.models.garage import Customer, RepairCase, RepairCaseStatus, Vehicle
 from app.models.media import Media
 from app.models.tracking import CaseMessage
 from app.models.workshop import WorkOrder, WorkOrderTask, WorkTaskStatus
-from app.schemas.garage import RepairCaseCreate, RepairCaseListItem, RepairCaseRead, RepairCaseUpdate
+from app.models.identity import User, UserStatus
+from app.schemas.garage import CaseMechanicUpdate, RepairCaseCreate, RepairCaseListItem, RepairCaseRead, RepairCaseUpdate
 from app.services.audit import record_audit
 from app.services.numbering import next_number
 from app.security.context import AuthContext, is_admin, require_permission
@@ -23,6 +24,18 @@ def staff_area(db: Session, auth: AuthContext) -> str | None:
     return user_area(db, auth.user_id, auth.tenant_id)
 
 router = APIRouter(prefix="/cases", tags=["repair-cases"])
+
+
+def user_names(db: Session, ids) -> dict:
+    ids = {value for value in ids if value}
+    if not ids:
+        return {}
+    return {user.id: (f"{user.first_name} {user.last_name}".strip() or user.email) for user in db.scalars(select(User).where(User.id.in_(ids))).all()}
+
+
+def case_read(db: Session, case: RepairCase) -> RepairCaseRead:
+    """The case with the name of the worker who opened it."""
+    return RepairCaseRead.model_validate(case).model_copy(update={"mechanic_name": user_names(db, [case.mechanic_id]).get(case.mechanic_id)})
 
 
 def next_case_number(db: Session, tenant_id) -> str:
@@ -57,9 +70,12 @@ def create_repair_case(
         **payload.model_dump(),
     )
     db.add(repair_case)
+    from app.services.staff import claim_case
+
+    claim_case(db, repair_case, auth.user_id)  # only when a workshop worker opens it
     db.commit()
     db.refresh(repair_case)
-    return repair_case
+    return case_read(db, repair_case)
 
 
 @router.get("", response_model=list[RepairCaseListItem])
@@ -101,6 +117,7 @@ def list_repair_cases(
         ).all():
             estimate_status[case_id] = value
 
+    names = user_names(db, [case.mechanic_id for case, _, _ in rows])
     return [
         RepairCaseListItem(
             id=case.id,
@@ -113,8 +130,27 @@ def list_repair_cases(
             customer_name=customer.company_name or f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "Cliente",
             mileage=case.mileage,
             estimate_status=estimate_status.get(case.id),
+            mechanic_id=case.mechanic_id,
+            mechanic_name=names.get(case.mechanic_id),
         )
         for case, vehicle, customer in rows
+    ]
+
+
+@router.get("/technicians")
+def list_technicians(db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("case.create"))):
+    """Workshop workers the office can put on a case (mechanics, bodyshop, painters)."""
+    from app.models.identity import UserRole
+    from app.services.staff import is_workshop_worker, user_area
+
+    users = db.scalars(
+        select(User).join(UserRole, UserRole.user_id == User.id)
+        .where(UserRole.tenant_id == auth.tenant_id, User.status != UserStatus.DISABLED)
+        .distinct().order_by(User.first_name, User.last_name)
+    ).all()
+    return [
+        {"id": str(user.id), "name": f"{user.first_name} {user.last_name}".strip() or user.email, "area": user_area(db, user.id, auth.tenant_id)}
+        for user in users if is_workshop_worker(db, user.id, auth.tenant_id)
     ]
 
 
@@ -123,7 +159,7 @@ def get_repair_case(case_id: UUID, db: Session = Depends(get_db), auth: AuthCont
     case = db.scalar(select(RepairCase).where(RepairCase.id == case_id, RepairCase.tenant_id == auth.tenant_id))
     if case is None:
         raise HTTPException(status_code=404, detail="Repair case not found")
-    return case
+    return case_read(db, case)
 
 
 @router.patch("/{case_id}", response_model=RepairCaseRead)
@@ -138,7 +174,35 @@ def update_repair_case(case_id: UUID, payload: RepairCaseUpdate, db: Session = D
     record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="repair_case", entity_id=case.id, action="updated", old_value=before, new_value=changes)
     db.commit()
     db.refresh(case)
-    return case
+    return case_read(db, case)
+
+
+# Once the job is delivered the worker on it is history: only an administrator corrects it.
+CLOSED_CASES = {RepairCaseStatus.DELIVERED, RepairCaseStatus.INVOICED}
+
+
+@router.put("/{case_id}/mechanic", response_model=RepairCaseRead)
+def set_case_mechanic(case_id: UUID, payload: CaseMechanicUpdate, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("case.create"))):
+    """The office puts a worker on a case, or corrects who opened it."""
+    from app.services.staff import is_workshop_worker
+
+    case = db.scalar(select(RepairCase).where(RepairCase.id == case_id, RepairCase.tenant_id == auth.tenant_id))
+    if case is None:
+        raise HTTPException(status_code=404, detail="Repair case not found")
+    if case.status in CLOSED_CASES and not is_admin(auth):
+        raise HTTPException(status_code=409, detail="Pratica chiusa: solo un amministratore può cambiare il meccanico")
+    if payload.mechanic_id is not None and not is_workshop_worker(db, payload.mechanic_id, auth.tenant_id):
+        raise HTTPException(status_code=422, detail="Scegli un meccanico o carrozziere dell'officina")
+    if payload.mechanic_id != case.mechanic_id:
+        old = case.mechanic_id
+        case.mechanic_id = payload.mechanic_id
+        case.mechanic_assigned_at = datetime.now(timezone.utc) if payload.mechanic_id else None
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="repair_case", entity_id=case.id,
+                     action="mechanic_changed", field_name="mechanic_id",
+                     old_value=str(old) if old else None, new_value=str(payload.mechanic_id) if payload.mechanic_id else None)
+        db.commit()
+        db.refresh(case)
+    return case_read(db, case)
 
 
 # Once the job reaches one of these, work has been done on the vehicle and the case is history.

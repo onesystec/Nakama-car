@@ -48,3 +48,32 @@ def task_in_area(task_type: str, area: str | None) -> bool:
 
 def normalize_plate(value: str | None) -> str:
     return "".join(ch for ch in (value or "").upper() if ch.isalnum())
+
+
+WORKSHOP_ROLES = set(ROLE_AREA)
+
+
+def is_workshop_worker(db: Session, user_id, tenant_id) -> bool:
+    """Mechanic, bodyshop or painter (by role, or by a work area chosen in the profile)."""
+    roles = set(user_roles(db, user_id, tenant_id))
+    if not roles:  # not a user of this workshop
+        return False
+    if WORKSHOP_ROLES & roles:
+        return True
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+    return profile is not None and profile.work_area in AREAS
+
+
+def claim_case(db: Session, case, user_id) -> bool:
+    """The worker who presses «Realizza lavoro» stays on the case to the end of the job.
+
+    Does nothing when the case already has someone: only the office changes it (PUT /cases/{id}/mechanic).
+    """
+    from datetime import datetime, timezone
+
+    if case is None or case.mechanic_id is not None or user_id is None:
+        return False
+    if not is_workshop_worker(db, user_id, case.tenant_id):
+        return False
+    case.mechanic_id, case.mechanic_assigned_at = user_id, datetime.now(timezone.utc)
+    return True
