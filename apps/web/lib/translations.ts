@@ -489,6 +489,7 @@ export const spanish: Record<string, string> = {
   "Ricarico %": "Recargo %",
   "Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.": "Recargo sobre el coste del recambio: solo para el taller, no aparece en el presupuesto del cliente.",
   "Totale preventivo": "Total presupuesto",
+  "In modifica qui sopra": "Editando arriba",
   "Torna al preventivo": "Volver al presupuesto",
   "Stampa": "Imprimir",
   "Scarica PDF": "Descargar PDF",

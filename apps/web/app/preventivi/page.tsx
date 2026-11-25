@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { SectionShell } from "../../components/SectionShell";
 import { useLanguage } from "../../components/LanguageProvider";
 import { apiError, apiFetch, estimateTone, formatMoney, getAccessToken, hasPermission, hidesEstimates, homeFor, openProtectedFile, sessionUser } from "../../lib/api";
@@ -68,6 +68,41 @@ function blankLine(rates: Record<string, string>): Line {
 /** What a line looked like when last saved, to tell which rows have unsaved edits. */
 function lineSignature(line: Line) {
   return JSON.stringify([line.category, line.description.trim(), ...numericFields.map((field) => Number(line[field] || 0))]);
+}
+
+/** The fields typed in the editor, to carry unsaved edits over a reload. */
+function editedFields(line: Line): Partial<Line> {
+  const fields: Partial<Line> = { category: line.category, description: line.description };
+  for (const field of numericFields) (fields as Record<string, string | undefined>)[field] = line[field];
+  return fields;
+}
+
+/**
+ * Put the lines just read from the server on screen without losing what the user is typing:
+ * rows with unsaved edits keep their values, and new rows not saved yet stay where they were.
+ * `fresh` are the rows just saved, which take the server's values.
+ */
+function mergeLines(current: Line[], loaded: Line[], saved: Record<string, string>, fresh: Set<string>): Line[] {
+  const byId = new Map(current.filter((line) => line.id).map((line) => [line.id, line]));
+  // Each unsaved new row follows the saved row that came before it (or opens the list).
+  const pending = new Map<string, Line[]>();
+  let anchor = "";
+  for (const line of current) {
+    if (line.id) anchor = line.id;
+    else pending.set(anchor, [...(pending.get(anchor) || []), line]);
+  }
+  const merged: Line[] = [...(pending.get("") || [])];
+  for (const server of loaded) {
+    const local = byId.get(server.id);
+    const edited = local && !fresh.has(server.id) && saved[server.id] !== undefined && saved[server.id] !== lineSignature(local);
+    merged.push(edited ? { ...server, ...editedFields(local) } : server);
+    merged.push(...(pending.get(server.id) || []));
+    pending.delete(server.id);
+  }
+  // Rows anchored to a line that no longer exists (deleted) go at the end.
+  pending.delete("");
+  for (const rows of pending.values()) merged.push(...rows);
+  return merged;
 }
 
 function linePayload(line: Line) {
@@ -192,20 +227,20 @@ export default function PreventiviPage() {
           {error && <div className="record-error" role="alert">{t(error)}</div>}
           {notice && <p className="staff-success" role="status">{notice}</p>}
           {shared && <SharePanel shared={shared} copied={copied} onCopy={() => navigator.clipboard.writeText(shared.url).then(() => setCopied(true), () => undefined)} onClose={() => setShared(null)} />}
-          {openId && <EstimateEditor key={openId} id={openId} onClose={() => { setOpenId(null); window.history.replaceState(null, "", "/preventivi"); load(); }} onChanged={load} />}
+          {openId && <EstimateEditor key={openId} id={openId} summary={items.find((x) => x.id === openId)} onClose={() => { setOpenId(null); window.history.replaceState(null, "", "/preventivi"); load(); }} onChanged={load} />}
           <div className="panel list-panel" aria-busy={busy}>
             <div className="data-table estimates head">
               <span>{t("Preventivo")}</span><span>{t("Cliente / targa")}</span><span>{t("Stato")}</span><span>{t("Imponibile")}</span><span>{t("Totale")}</span><span>{t("Azioni")}</span>
             </div>
             {busy ? <div className="empty-state">{t("Caricamento…")}</div> : items.length === 0 ? <div className="empty-state">{t("Nessun preventivo.")}</div> : items.map((x) => (
-              <div className={`data-table estimates${estimateTone(x.status) ? ` tone-${estimateTone(x.status)}` : ""}`} key={x.id}>
+              <div className={`data-table estimates${estimateTone(x.status) ? ` tone-${estimateTone(x.status)}` : ""}${x.id === openId ? " editing" : ""}`} key={x.id}>
                 <span><strong>{x.estimate_number}</strong><small>{x.case_number} · v{x.version}{x.created_at ? ` · ${new Date(x.created_at).toLocaleDateString("it-IT")}` : ""}</small>{x.diagnosis_at && <small>📅 {t("Diagnosi del")} {new Date(x.diagnosis_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</small>}</span>
-                <span>{x.customer_name}<small>{x.plate}{x.contract_name ? ` · ${t("Contratto")}: ${x.contract_name}` : ""}</small></span>
+                <span className="estimate-vehicle">{x.plate && <span className="plate-chip">{x.plate}</span>}<span>{x.customer_name}</span>{x.contract_name && <small>{t("Contratto")}: {x.contract_name}</small>}{x.id === openId && <small className="editing-note">{t("In modifica qui sopra")}</small>}</span>
                 <EstimateChip status={x.status} />
                 <span>{formatMoney(x.subtotal)}</span>
                 <strong>{formatMoney(x.total)}</strong>
                 <span className="table-actions wrap">
-                  <button onClick={() => { setOpenId(x.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}>{x.status === "APPROVED" ? t("Apri") : t("Modifica")}</button>
+                  <button onClick={() => { setOpenId(x.id); window.history.replaceState(null, "", `/preventivi?id=${x.id}`); }}>{x.status === "APPROVED" ? t("Apri") : t("Modifica")}</button>
                   <button onClick={() => { window.location.href = `/preventivi/anteprima?id=${x.id}`; }}>{t("Anteprima")}</button>
                   <button onClick={() => pdf(x)}>PDF</button>
                   {x.status !== "APPROVED" && <button onClick={() => share(x.id)}>{t("Invia")}</button>}
@@ -224,8 +259,11 @@ export default function PreventiviPage() {
   );
 }
 
-function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summary?: Estimate; onClose: () => void; onChanged: () => void }) {
   const { t } = useLanguage();
+  const panelRef = useRef<HTMLElement>(null);
+  // "Modifica" from far down the list: bring the editor into view at once.
+  useEffect(() => { panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [id]);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [rates, setRates] = useState<Record<string, string>>({});
@@ -233,8 +271,11 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
   const [savingId, setSavingId] = useState<string | null>(null);
   const [canEditPrices, setCanEditPrices] = useState(false);
   const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
+  // Same as savedSignatures, readable inside state updaters after an await.
+  const savedRef = useRef<Record<string, string>>({});
 
-  async function reload() {
+  /** Read the estimate again. Unsaved edits in the other rows are kept; `fresh` rows take the saved values. */
+  async function reload(fresh: string[] = []) {
     const [estimateResponse, linesResponse] = await Promise.all([apiFetch(`/estimates/${id}`), apiFetch(`/estimates/${id}/lines`)]);
     if (!estimateResponse.ok || !linesResponse.ok) {
       setError(t("Preventivo non trovato."));
@@ -243,8 +284,12 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
     setEstimate(await estimateResponse.json());
     const data: Line[] = await linesResponse.json();
     const loaded = data.map((line) => Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value === null ? "" : String(value)])) as unknown as Line);
-    setLines(loaded);
-    setSavedSignatures(Object.fromEntries(loaded.map((line) => [line.id, lineSignature(line)])));
+    const previous = savedRef.current;
+    const freshIds = new Set(fresh);
+    setLines((current) => mergeLines(current, loaded, previous, freshIds));
+    const signatures = Object.fromEntries(loaded.map((line) => [line.id, lineSignature(line)]));
+    savedRef.current = signatures;
+    setSavedSignatures(signatures);
   }
 
   useEffect(() => {
@@ -318,10 +363,12 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
       return null;
     }
     const savedId: string = line.id || (await response.json()).id;
+    // A new row gets its id here, so the next reload recognises it instead of showing it twice.
+    if (!line.id) setLines((previous) => previous.map((other) => (other === line ? { ...other, id: savedId } : other)));
     if (refresh) {
       // A new line is added at the end on the server: keep it where it was placed here.
       if (!line.id && index < lines.length - 1) await saveOrder(lines.map((other, position) => (position === index ? savedId : other.id)));
-      await reload();
+      await reload([savedId]);
       onChanged();
     }
     return savedId;
@@ -336,6 +383,7 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
   async function saveAll() {
     let ok = true;
     const ids = lines.map((line) => line.id);
+    const saved: string[] = [];
     for (let index = 0; index < lines.length; index += 1) {
       if (!priced[index].dirty) continue;
       const savedId = await saveLine(index, false);
@@ -344,9 +392,10 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
         break;
       }
       ids[index] = savedId;
+      saved.push(savedId);
     }
     if (ok && lines.some((line) => !line.id)) await saveOrder(ids);
-    await reload();
+    await reload(saved);
     onChanged();
     if (ok) setError("");
   }
@@ -379,10 +428,14 @@ function EstimateEditor({ id, onClose, onChanged }: { id: string; onClose: () =>
   }
 
   return (
-    <section className="panel record-editor estimate-editor" aria-label={t("Preventivo")}>
+    <section ref={panelRef} className="panel record-editor estimate-editor" aria-label={t("Preventivo")}>
       <div className="panel-head">
         <div>
-          <h2>{estimate?.estimate_number || t("Caricamento…")}</h2>
+          <h2 className="estimate-title">
+            {summary?.plate && <span className="plate-chip big">{summary.plate}</span>}
+            <span>{estimate?.estimate_number || t("Caricamento…")}</span>
+            {summary?.customer_name && <small>{summary.customer_name}</small>}
+          </h2>
           {estimate && <p><EstimateChip status={estimate.status} /> {t("Totale")} <strong>{formatMoney(liveTotal)}</strong> ({t("imponibile")} {formatMoney(liveSubtotal)} + {t("IVA")} {formatMoney(liveVat)})</p>}
           {estimate && (unpricedCount > 0 || dirtyCount > 0) && (
             <p className="estimate-flags">

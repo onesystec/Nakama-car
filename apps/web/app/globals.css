@@ -2485,3 +2485,12 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 }
 .costs-delete { margin-left: 10px; border: 1px solid #e3c4c9; background: transparent; color: #c0283f; border-radius: 6px; width: 24px; height: 24px; line-height: 1; cursor: pointer; font-size: 15px; }
 .costs-delete:hover { background: #fff0f2; }
+
+/* Preventivi: targa in evidenza e preventivo aperto segnato nella lista */
+.estimate-editor { scroll-margin-top: 80px; }
+.estimate-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.estimate-title small { font-size: 14px; font-weight: 600; color: var(--muted, #5b6470); }
+.estimate-vehicle { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.estimate-vehicle .plate-chip { font-size: 15px; }
+.data-table.estimates.editing { outline: 2px solid #1f4aa0; outline-offset: -2px; background: rgba(31, 74, 160, .06); }
+.editing-note { color: #1f4aa0; font-weight: 700; }
