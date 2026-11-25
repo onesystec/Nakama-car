@@ -2534,3 +2534,27 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .job-mechanic.free { color: var(--warning); }
 .job-mechanic.mine { color: var(--success); }
 .job-take:not(.taken) { border: 0; background: none; padding: 0; }
+
+/* «Il mio lavoro» compatto: meno spazio tra riquadri e testi. */
+.panel:has(> .job-grid) .panel-head, .panel:has(> .empty-state) .panel-head { padding: 10px 14px; }
+.panel:has(> .job-grid) .panel-head h2 { font-size: 15px; }
+.job-grid { gap: 8px; padding: 10px 12px; }
+.job-card { gap: 3px; padding: 10px 12px; }
+.job-card .new-tag { margin-bottom: 2px; }
+.new-jobs-banner { padding: 8px 12px; margin-bottom: 8px; }
+.panel + .panel:has(> .job-grid), .panel:has(> .job-grid) + .panel { margin-top: 8px; }
+.job-detail { padding: 12px; gap: 8px; }
+.job-head { gap: 10px; }
+.job-vehicle-view { gap: 10px; }
+.job-specs { gap: 6px; padding: 10px; }
+.job-request { padding: 8px 10px; }
+.job-take { margin: 0; }
+.job-take.taken { padding: 8px 12px; }
+.task-group-title { margin: 2px 0 0; }
+.task-buttons { gap: 8px; }
+.task-button { min-height: 64px; padding: 10px; gap: 10px; }
+.task-card { gap: 4px; }
+.task-note { padding: 6px 10px; }
+.panel > .empty-state { padding: 12px 14px; margin: 0; }
+.job-vehicle-view .damage-photo-map { margin: 0; gap: 6px; }
+.job-detail > .hint, .job-detail > h3 { margin: 0; }
