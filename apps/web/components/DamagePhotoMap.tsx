@@ -363,7 +363,6 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
   const [images, setImages] = useState<Partial<Record<MarkerView, string | null>>>({});
   const [ratios, setRatios] = useState<Partial<Record<MarkerView, number>>>({});
   const [disabled, setDisabled] = useState(false);
-  const [notice, setNotice] = useState("");
   const [pending, setPending] = useState<{ x: number; y: number } | null>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvas = useRef<HTMLDivElement>(null);
@@ -415,7 +414,6 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
     });
     setRatios({});
     setDisabled(false);
-    setNotice(ready ? "" : "Inserisci marca e modello per vedere le foto reali del veicolo.");
   }, [make, model, year, color, ready]);
 
   // Frames are fetched one after the other, starting with the one on screen.
@@ -454,10 +452,7 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
       setImages((current) => ({ ...current, [next]: null }));
       // Only a missing service or the monthly cap stop the other views.
       if (!response || response.status === 503 || response.status === 429) {
-        setDisabled(true);
-        setNotice(response?.status === 429 ? "Limite mensile di foto raggiunto: uso lo schema del veicolo." : "Foto reali non disponibili: uso lo schema del veicolo.");
-      } else if (response.status === 404 && next !== "top") {
-        setNotice("Modello non presente nel catalogo foto: uso lo schema del veicolo.");
+        setDisabled(true);  // the vehicle drawing is used, without a message
       }
     })();
     return () => { cancelled = true; };
@@ -946,7 +941,6 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
           <button type="button" className="ghost" onClick={() => setPending(null)}>{t("Annulla")}</button>
         </div>
       )}
-      {notice && <p className="hint">{t(notice)}</p>}
       {markers.length > 0 && (
         <ol className="damage-list">
           {markers.map((marker, position) => (

@@ -208,7 +208,6 @@ export default function OfficinaPage() {
           {data.new_jobs > 0 && (
             <div className="new-jobs-banner" role="status">
               <strong>🔔 {data.new_jobs === 1 ? t("1 lavoro nuovo approvato dal cliente") : t("{n} lavori nuovi approvati dal cliente").replace("{n}", String(data.new_jobs))}</strong>
-              <span>{allAreas ? t("In attesa che il meccanico o il carrozziere inizi.") : t("Puoi iniziare: aprilo e tocca ogni lavoro quando lo finisci.")}</span>
             </div>
           )}
           {allAreas ? areaOrder.map((area) => {
@@ -217,19 +216,18 @@ export default function OfficinaPage() {
               <section key={area} className="panel">
                 <div className="panel-head"><div>
                   <h2>{area === "BODY" ? "🚗" : "🔧"} {t(area === "BODY" ? "Lavori in carrozzeria" : "Lavori in meccanica")} · {jobs.length}</h2>
-                  <p>{t("Veicoli approvati dal cliente e lo stato di ogni lavoro.")}</p>
                 </div></div>
                 {jobs.length === 0 ? <div className="empty-state">{t("Nessun lavoro in corso.")}</div> : <div className="job-grid">{jobs.map(card)}</div>}
               </section>
             );
           }) : (
             <section className="panel">
-              <div className="panel-head"><div><h2>{t("Lavori da fare")} · {data.jobs.length}</h2><p>{t("Veicoli approvati dal cliente. Apri un veicolo per vedere i lavori da fare.")}</p></div></div>
+              <div className="panel-head"><div><h2>{t("Lavori da fare")} · {data.jobs.length}</h2></div></div>
               {data.jobs.length === 0 ? <div className="empty-state">{t("Nessun veicolo in lavorazione nella tua area.")}</div> : <div className="job-grid">{data.jobs.map(card)}</div>}
             </section>
           )}
           <section className="panel">
-            <div className="panel-head"><div><h2>{t("In attesa di diagnosi")} · {data.waiting.length}</h2><p>{t("Veicoli arrivati che aspettano la diagnosi per il preventivo.")}</p></div></div>
+            <div className="panel-head"><div><h2>{t("In attesa di diagnosi")} · {data.waiting.length}</h2></div></div>
             {data.waiting.length === 0 ? <div className="empty-state">{t("Nessun veicolo in attesa.")}</div> : (
               <div className="job-grid">
                 {data.waiting.map((item) => (
@@ -246,7 +244,7 @@ export default function OfficinaPage() {
           </section>
           {data.pending.length > 0 && (
             <section className="panel">
-              <div className="panel-head"><div><h2>{t("In ufficio o dal cliente")} · {data.pending.length}</h2><p>{t("Diagnosi già inviate: appena il cliente approva, il veicolo passa in «Lavori da fare».")}</p></div></div>
+              <div className="panel-head"><div><h2>{t("In ufficio o dal cliente")} · {data.pending.length}</h2></div></div>
               <div className="job-grid">
                 {data.pending.map((item) => (
                   <div key={item.repair_case_id} className={`job-card pending stage-${item.stage.toLowerCase()}`}>
@@ -349,7 +347,7 @@ function JobDetail({ job, busy, onBack, onToggle, onSaveNote, actions, onTake }:
       <div className="job-progress" aria-label={`${job.done}/${job.total}`}>
         <span style={{ width: `${job.total ? (job.done / job.total) * 100 : 0}%` }} />
       </div>
-      <p className="hint">{job.done}/{job.total} {t("completati")} · {t("Tocca un lavoro quando lo finisci; toccalo di nuovo se ti sei sbagliato. Con 💬 aggiungi una nota.")}</p>
+      <p className="hint">{job.done}/{job.total} {t("completati")}</p>
 
       {items.length > 0 && (
         <>
