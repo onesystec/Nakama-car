@@ -10,6 +10,7 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 
 from app.services.company import LOGO_PATH, company_lines, company_profile
 from app.services.pricing import PUBLIC_TERMS, price_line
+from app.services.vehicle_names import short_vehicle_name
 
 NAVY = colors.HexColor("#0B2A4A")
 GRID = colors.HexColor("#D9DDE2")
@@ -150,7 +151,7 @@ def build_estimate_pdf(
     story.append(_info_table([
         ["Preventivo", estimate.estimate_number, "Data", _date(getattr(estimate, "created_at", None))],
         ["Cliente", customer_name(customer), "Targa", vehicle.license_plate],
-        ["Veicolo", " ".join(filter(None, [vehicle.make, vehicle.model, vehicle.version])) or "—", "VIN / Telaio", vehicle.vin or "—"],
+        ["Veicolo", short_vehicle_name(vehicle.make, vehicle.model, vehicle.version) or "—", "VIN / Telaio", vehicle.vin or "—"],
         ["Km", str(vehicle.mileage or "—"), "N. flotta", getattr(vehicle, "fleet_number", None) or "—"],
     ]))
     story.append(Spacer(1, 5 * mm))
