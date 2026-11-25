@@ -577,7 +577,6 @@ def write_diagnosis(db: Session, auth: AuthContext, diagnosis: Diagnosis, payloa
     diagnosis.vehicle_id = vehicle.id if vehicle else (case.vehicle_id if case else None)
     diagnosis.repair_case_id = case.id if case else None
     diagnosis.work_type = work_type
-    staff.claim_case(db, case, diagnosis.created_by)  # the worker who opens the job stays on it
     diagnosis.mileage = payload.mileage
     diagnosis.fuel_level = payload.fuel_level
     if case is not None:
@@ -708,7 +707,6 @@ def diagnosis_to_estimate(
         db.add(case)
         db.flush()
     diagnosis.repair_case_id = case.id
-    staff.claim_case(db, case, diagnosis.created_by)  # the worker who made the diagnosis opened the job
     attach_photos_to_case(db, diagnosis, case.id)
 
     estimate = Estimate(
@@ -881,6 +879,7 @@ def my_work(db: Session = Depends(get_db), auth: AuthContext = Depends(require_p
             if staff.task_in_area(task.task_type, area):
                 tasks_by_order.setdefault(task.work_order_id, []).append(task)
     who = {task.completed_by for items in tasks_by_order.values() for task in items if task.completed_by}
+    who |= {case.mechanic_id for _, case, _, _ in rows if case.mechanic_id}
     names = {user.id: f"{user.first_name} {user.last_name}".strip() for user in db.scalars(select(User).where(User.id.in_(who))).all()} if who else {}
     jobs = []
     for order, case, vehicle, customer in rows:
@@ -892,6 +891,10 @@ def my_work(db: Session = Depends(get_db), auth: AuthContext = Depends(require_p
             "color": vehicle.color_name, "customer_name": customer_display_name(customer), "request": case.customer_notes,
             "details": vehicle_details(db, vehicle, case), "internal_notes": case.internal_notes,
             "tasks": [task_dict(task, names) for task in tasks],
+            # Who said «Realizza lavoro» on this case (stays to the end of the job).
+            "mechanic_id": str(case.mechanic_id) if case.mechanic_id else None,
+            "mechanic_name": names.get(case.mechanic_id) if case.mechanic_id else None,
+            "mine": case.mechanic_id == auth.user_id,
             "done": (done := sum(1 for task in tasks if task.status == WorkTaskStatus.DONE)), "total": len(tasks),
             # Approved by the customer and nobody has started yet.
             "is_new": done == 0 and order.status == WorkOrderStatus.APPROVED, "approved_at": order.created_at,
@@ -974,15 +977,37 @@ def my_work_render(case_id: UUID, view: str = Path(pattern=VIEW_PATTERN), db: Se
     return case_render(db, case, view)
 
 
+@router.post("/my-work/cases/{case_id}/take")
+def take_case(case_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("work_order.update_status"))):
+    """«Realizza lavoro»: the worker, sure the job is theirs, puts their name on the case until the end."""
+    case = db.scalar(select(RepairCase).where(RepairCase.id == case_id, RepairCase.tenant_id == auth.tenant_id))
+    if case is None:
+        raise HTTPException(status_code=404, detail="Repair case not found")
+    area = staff.user_area(db, auth.user_id, auth.tenant_id)
+    if area and case.work_type != area:
+        raise HTTPException(status_code=403, detail="Questo lavoro non è della tua area")
+    if case.mechanic_id is not None and case.mechanic_id != auth.user_id:
+        raise HTTPException(status_code=409, detail=f"Questo lavoro lo fa già {user_name(db, case.mechanic_id) or 'un altro collega'}")
+    if not staff.claim_case(db, case, auth.user_id) and case.mechanic_id != auth.user_id:
+        raise HTTPException(status_code=403, detail="Solo il personale dell'officina può prendere un lavoro")
+    record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="repair_case", entity_id=case.id,
+                 action="mechanic_taken", field_name="mechanic_id", new_value=str(auth.user_id))
+    db.commit()
+    return {"repair_case_id": str(case.id), "mechanic_id": str(case.mechanic_id), "mechanic_name": user_name(db, case.mechanic_id),
+            "mechanic_assigned_at": case.mechanic_assigned_at.isoformat() if case.mechanic_assigned_at else None}
+
+
 @router.post("/my-work/tasks/{task_id}")
 def toggle_task(task_id: UUID, payload: TaskToggle, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("work_order.update_status"))):
     """Tick a task as done (or untick it if pressed by mistake)."""
     task = my_task(db, auth, task_id)
     old = task.status.value
     if payload.done:
+        case = db.scalar(select(RepairCase).join(WorkOrder, WorkOrder.repair_case_id == RepairCase.id).where(WorkOrder.id == task.work_order_id))
+        # A worker first says «Realizza lavoro», so the case records who does the job.
+        if case is not None and case.mechanic_id is None and not is_manager(auth):
+            raise HTTPException(status_code=409, detail="Prima tocca «Realizza lavoro»: così la pratica registra chi fa il lavoro")
         task.status, task.completed_by, task.completed_at = WorkTaskStatus.DONE, auth.user_id, datetime.now(timezone.utc)
-        # A job opened without a diagnosis gets the first worker who does something on it.
-        staff.claim_case(db, db.scalar(select(RepairCase).join(WorkOrder, WorkOrder.repair_case_id == RepairCase.id).where(WorkOrder.id == task.work_order_id)), auth.user_id)
     else:
         task.status, task.completed_by, task.completed_at = WorkTaskStatus.PENDING, None, None
     record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="work_task", entity_id=task.id,

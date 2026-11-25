@@ -65,7 +65,7 @@ def is_workshop_worker(db: Session, user_id, tenant_id) -> bool:
 
 
 def claim_case(db: Session, case, user_id) -> bool:
-    """The first workshop worker who works on a case (diagnosis or first job) stays on it to the end.
+    """The worker who presses «Realizza lavoro» stays on the case to the end of the job.
 
     Does nothing when the case already has someone: only the office changes it (PUT /cases/{id}/mechanic).
     """

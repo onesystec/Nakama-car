@@ -2521,3 +2521,15 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .case-mechanic-edit select { flex: 1 1 200px; min-width: 0; }
 .case-mechanic-error { flex: 1 1 100%; margin: 0; color: var(--danger); }
 .case-row-mechanic { display: inline-block; margin-left: 8px; white-space: nowrap; font-weight: 600; color: var(--ink); }
+
+/* «Realizza lavoro»: the worker takes the job; their name stays on the pratica. */
+.job-take { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 14px 0; padding: 14px 16px; border: 2px dashed var(--warning); border-radius: 12px; background: var(--soft); }
+.job-take > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 240px; min-width: 0; }
+.job-take small { color: var(--muted); }
+.job-take > span { font-size: 24px; }
+.job-take button { font-size: 18px; padding: 12px 22px; }
+.job-take.taken { border-style: solid; border-color: var(--line); }
+.job-take.taken.mine { border-color: var(--success); }
+.job-mechanic { font-weight: 700; }
+.job-mechanic.free { color: var(--warning); }
+.job-mechanic.mine { color: var(--success); }

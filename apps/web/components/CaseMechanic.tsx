@@ -59,8 +59,8 @@ export function CaseMechanic({ caseId, workType, status, mechanicId, mechanicNam
       <small>{role}</small>
       {mechanicName
         ? <strong>{mechanicName}</strong>
-        : <em>{words("Nessuno ancora: resta registrato chi fa la diagnosi o il primo lavoro.", "Nadie todavía: queda registrado quien haga el diagnóstico o el primer trabajo.")}</em>}
-      {mechanicName && date && <small>{words(`Ha aperto la pratica il ${date}`, `Abrió el expediente el ${date}`)}</small>}
+        : <em>{words("Nessuno ancora: il meccanico lo prende con «Realizza lavoro» in «Il mio lavoro».", "Nadie todavía: el mecánico lo coge con «Realizza lavoro» en «Il mio lavoro».")}</em>}
+      {mechanicName && date && <small>{words(`Ha preso il lavoro il ${date}`, `Cogió el trabajo el ${date}`)}</small>}
     </div>
     {canAssign && !editing && !locked && <button type="button" className="ghost" onClick={() => setEditing(true)}>{mechanicName ? words("Cambia", "Cambiar") : words("Assegna", "Asignar")}</button>}
     {editing && <div className="case-mechanic-edit">

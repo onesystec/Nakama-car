@@ -112,6 +112,7 @@ def test_my_work_shows_my_area_and_tasks_toggle(client):
     assert jobs[0]["request"] == "Tagliando" and jobs[0]["plate"] == "GM555MM"
     assert "PAINT" not in {t["task_type"] for t in jobs[0]["tasks"]}
     task = jobs[0]["tasks"][0]
+    assert mine.post(f"/api/v1/my-work/cases/{case['id']}/take").status_code == 200  # «Realizza lavoro»
     done = mine.post(f"/api/v1/my-work/tasks/{task['id']}", json={"done": True})
     assert done.status_code == 200 and done.json()["status"] == "DONE" and done.json()["completed_by"]
     assert mine.get("/api/v1/my-work").json()["jobs"][0]["done"] == 1
@@ -159,6 +160,7 @@ def test_flow_mechanic_office_customer_back_to_mechanic(client):
     assert c.post(f"/api/v1/work-orders/from-estimate/{converted['estimate_id']}").json()["id"] == job["work_order_id"]  # no duplicate
 
     # 5. First task ticked: no longer new.
+    mechanic.post(f"/api/v1/my-work/cases/{job['repair_case_id']}/take")
     mechanic.post(f"/api/v1/my-work/tasks/{job['tasks'][0]['id']}", json={"done": True})
     assert mechanic.get("/api/v1/my-work").json()["new_jobs"] == 0
 

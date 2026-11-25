@@ -114,7 +114,7 @@ class RepairCase(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     customer_notes: Mapped[str | None] = mapped_column(Text)
     internal_notes: Mapped[str | None] = mapped_column(Text)
     opened_at: Mapped[datetime | None]
-    # Workshop worker who opened the job (author of the first diagnosis, or the first to tick a job):
-    # stays on the case to the end, so it is clear who did the work. Only the office can correct it.
+    # Workshop worker who pressed «Realizza lavoro» (sure the job is theirs): stays on the case to the
+    # end, so it is clear who did the work. Only the office can correct it.
     mechanic_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     mechanic_assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
