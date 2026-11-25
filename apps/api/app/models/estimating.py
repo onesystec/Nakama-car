@@ -92,6 +92,8 @@ class EstimateLine(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     operation: Mapped[str | None] = mapped_column(String(120))
     part: Mapped[str | None] = mapped_column(String(160))
     oem_code: Mapped[str | None] = mapped_column(String(120))
+    # Where the part was bought: for the workshop only, never on estimates, PDFs or invoices.
+    supplier: Mapped[str | None] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=1)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)

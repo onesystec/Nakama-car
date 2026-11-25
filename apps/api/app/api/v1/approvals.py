@@ -20,6 +20,7 @@ from app.security.context import AuthContext, require_any_permission
 from app.services.access import LEGAL_VERSION, client_ip
 from app.services.estimate_links import link_expired, new_expiry, renew_if_expired
 from app.services.contracts import customer_display_name
+from app.services.pricing import PricingTerms, customer_document_lines
 from app.services.workshop import open_work_order
 
 router = APIRouter(tags=["estimate-approval"])
@@ -140,6 +141,8 @@ def public_estimate(token: str, db: Session = Depends(get_db)):
         )
         .order_by(EstimateLine.position, EstimateLine.created_at, EstimateLine.id)
     ).all()
+
+    lines = customer_document_lines(lines, PricingTerms.from_source(estimate))
 
     customer_name = customer.company_name or f"{customer.first_name or ''} {customer.last_name or ''}".strip()
     vehicle_name = " ".join(filter(None, [vehicle.make, vehicle.model, vehicle.version]))

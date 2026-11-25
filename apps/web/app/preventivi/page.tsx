@@ -45,12 +45,15 @@ type Line = {
   paint_rate: string;
   materials: string;
   vat_rate: string;
+  /** Where the part was bought: only for the workshop, never on the customer's documents. */
+  supplier?: string;
   parts_amount?: string;
   labor_amount?: string;
   line_total?: string;
 };
 
-const statuses = ["", "DRAFT", "SENT", "APPROVED", "REJECTED"];
+// "Da valutare" groups everything still waiting for an answer (draft, sent, viewed).
+const statuses: [string, string][] = [["", "Tutti"], ["PENDING", "Da valutare"], ["APPROVED", "Accettato"], ["REJECTED", "Rifiutato"]];
 const categories = ["PART", "MECHANICAL_LABOR", "DIAGNOSTIC", "ELECTRICAL", "BODY_LABOR", "PAINT", "MATERIAL", "EXTERNAL_SERVICE", "DISPOSAL", "OTHER"];
 const rateKeyByCategory: Record<string, string> = {
   MECHANICAL_LABOR: "MECHANICAL", DIAGNOSTIC: "DIAGNOSTIC", ELECTRICAL: "ELECTRICAL", BODY_LABOR: "BODY", PAINT: "PAINT",
@@ -61,18 +64,18 @@ function blankLine(rates: Record<string, string>): Line {
   return {
     id: "", category: "PART", description: "", quantity: "1", unit_price: "0", markup_percent: "0", discount_percent: "0",
     labor_hours: "0", labor_rate: rates.MECHANICAL || "50", paint_hours: "0", paint_rate: rates.PAINT || "48",
-    materials: "0", vat_rate: "22",
+    materials: "0", vat_rate: "22", supplier: "",
   };
 }
 
 /** What a line looked like when last saved, to tell which rows have unsaved edits. */
 function lineSignature(line: Line) {
-  return JSON.stringify([line.category, line.description.trim(), ...numericFields.map((field) => Number(line[field] || 0))]);
+  return JSON.stringify([line.category, line.description.trim(), (line.supplier || "").trim(), ...numericFields.map((field) => Number(line[field] || 0))]);
 }
 
 /** The fields typed in the editor, to carry unsaved edits over a reload. */
 function editedFields(line: Line): Partial<Line> {
-  const fields: Partial<Line> = { category: line.category, description: line.description };
+  const fields: Partial<Line> = { category: line.category, description: line.description, supplier: line.supplier };
   for (const field of numericFields) (fields as Record<string, string | undefined>)[field] = line[field];
   return fields;
 }
@@ -130,7 +133,7 @@ function writeDraft(id: string, draft: Draft | null) {
 }
 
 function linePayload(line: Line) {
-  const payload: Record<string, string | number> = { category: line.category, description: line.description.trim() };
+  const payload: Record<string, string | number | null> = { category: line.category, description: line.description.trim(), supplier: (line.supplier || "").trim() || null };
   for (const field of numericFields) payload[field] = Number(line[field] || 0);
   return payload;
 }
@@ -223,6 +226,21 @@ export default function PreventiviPage() {
     if (await act(`/estimates/${id}/status`, { method: "PATCH", body: JSON.stringify({ status: next }) }, "Impossibile aggiornare lo stato")) load();
   }
 
+  async function deleteEstimate(estimate: Estimate) {
+    if (!confirm(t("Eliminare il preventivo {number}? Le righe saranno cancellate e non si potrà recuperare.").replace("{number}", estimate.estimate_number))) return;
+    setError("");
+    setNotice("");
+    const response = await apiFetch(`/estimates/${estimate.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      setError(t(await apiError(response, "Impossibile eliminare il preventivo.")));
+      return;
+    }
+    try { localStorage.removeItem(draftKey(estimate.id)); } catch { /* storage blocked */ }
+    if (openId === estimate.id) { setOpenId(null); window.history.replaceState(null, "", "/preventivi"); }
+    setNotice(t("Preventivo {number} eliminato.").replace("{number}", estimate.estimate_number));
+    load();
+  }
+
   async function createWorkOrder(id: string) {
     const order = await act(`/work-orders/from-estimate/${id}`, { method: "POST" }, "Impossibile creare ordine di lavoro");
     if (order) setNotice(t("Ordine {number} creato.").replace("{number}", order.work_order_number));
@@ -243,7 +261,7 @@ export default function PreventiviPage() {
             <label>{t("Cerca")}<input type="search" value={query} placeholder={t("Numero, targa, n. flotta o cliente")} onChange={(e) => setQuery(e.target.value)} /></label>
             <label className="narrow">{t("Stato")}
               <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                {statuses.map((code) => <option key={code || "all"} value={code}>{code ? t(code) : t("Tutti")}</option>)}
+                {statuses.map(([code, label]) => <option key={code || "all"} value={code}>{t(label)}</option>)}
               </select>
             </label>
             <button className="secondary">{t("Cerca")}</button>
@@ -271,6 +289,7 @@ export default function PreventiviPage() {
                   {x.status !== "APPROVED" && <button className="tone-button accepted" onClick={() => setEstimateStatus(x.id, "APPROVED")}>{t("Accettato")}</button>}
                   {x.status !== "APPROVED" && x.status !== "REJECTED" && <button className="tone-button rejected" onClick={() => setEstimateStatus(x.id, "REJECTED")}>{t("Rifiutato")}</button>}
                   {x.status === "REJECTED" && <button className="tone-button pending" onClick={() => setEstimateStatus(x.id, "SENT")}>{t("Da valutare")}</button>}
+                  {x.status !== "APPROVED" && canCreate && <button className="danger-outline" onClick={() => deleteEstimate(x)}>{t("Elimina")}</button>}
                   {x.status === "APPROVED" && <button onClick={() => createWorkOrder(x.id)}>ODL</button>}
                   {x.status === "APPROVED" && <button onClick={() => createInvoice(x.id)}>{t("Fattura")}</button>}
                 </span>
@@ -535,7 +554,14 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
             <select aria-label={t("Tipo")} disabled={locked} value={line.category} onChange={(e) => update(index, { category: e.target.value })}>
               {categories.map((code) => <option key={code} value={code}>{t(code)}</option>)}
             </select>
-            <input aria-label={t("Descrizione")} disabled={locked} value={line.description} maxLength={255} onChange={(e) => update(index, { description: e.target.value })} />
+            <div className="line-desc">
+              <input aria-label={t("Descrizione")} disabled={locked} value={line.description} maxLength={255} onChange={(e) => update(index, { description: e.target.value })} />
+              {line.category === "PART" && (
+                <input className="line-supplier" aria-label={t("Acquistato da")} title={t("Dove è stato comprato il ricambio: solo per l’officina, non compare nel preventivo né in fattura.")}
+                  placeholder={t("Acquistato da… (solo officina)")} disabled={locked} value={line.supplier || ""} maxLength={120}
+                  onChange={(e) => update(index, { supplier: e.target.value })} />
+              )}
+            </div>
             {(["quantity", "unit_price", "markup_percent", "discount_percent", "labor_hours", "labor_rate", "paint_hours", "materials", "vat_rate"] as (keyof Line)[]).map((field) => (
               <label key={field} className={`line-field${priced[index].missing.has(field as never) ? " missing" : ""}${field === "markup_percent" ? " internal" : ""}`} title={field === "markup_percent" ? t("Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.") : undefined}>
                 <small>{t(fieldLabels[field] || String(field))}</small>

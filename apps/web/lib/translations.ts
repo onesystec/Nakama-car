@@ -490,6 +490,14 @@ export const spanish: Record<string, string> = {
   "Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.": "Recargo sobre el coste del recambio: solo para el taller, no aparece en el presupuesto del cliente.",
   "Totale preventivo": "Total presupuesto",
   "In modifica qui sopra": "Editando arriba",
+  "Acquistato da": "Comprado en",
+  "Acquistato da… (solo officina)": "Comprado en… (solo taller)",
+  "Dove è stato comprato il ricambio: solo per l’officina, non compare nel preventivo né in fattura.": "Dónde se compró el recambio: solo para el taller, no aparece en el presupuesto ni en la factura.",
+  "Eliminare il preventivo {number}? Le righe saranno cancellate e non si potrà recuperare.": "¿Eliminar el presupuesto {number}? Se borrarán sus líneas y no se podrá recuperar.",
+  "Impossibile eliminare il preventivo.": "No se pudo eliminar el presupuesto.",
+  "Preventivo {number} eliminato.": "Presupuesto {number} eliminado.",
+  "Il preventivo accettato non si può eliminare.": "El presupuesto aceptado no se puede eliminar.",
+  "Il preventivo ha una fattura o un ordine di lavoro: non si può eliminare.": "El presupuesto tiene factura u orden de trabajo: no se puede eliminar.",
   "Ripristinata 1 riga non salvata dall’ultima volta.": "Recuperada 1 línea no guardada de la última vez.",
   "Ripristinate {n} righe non salvate dall’ultima volta.": "Recuperadas {n} líneas no guardadas de la última vez.",
   "Controlla e premi Salva tutto.": "Revisa y pulsa Guardar todo.",
@@ -710,8 +718,8 @@ const codes: Record<string, [string, string]> = {
     "Bloqueado"
   ],
   "DRAFT": [
-    "Bozza",
-    "Borrador"
+    "Da valutare",
+    "Por evaluar"
   ],
   "ISSUED": [
     "Emessa",

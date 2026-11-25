@@ -9,7 +9,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.services.company import LOGO_PATH, company_lines, company_profile
-from app.services.pricing import PUBLIC_TERMS, price_line
+from app.services.pricing import PUBLIC_TERMS, customer_document_lines, price_line
 from app.services.vehicle_names import short_vehicle_name
 
 NAVY = colors.HexColor("#0B2A4A")
@@ -167,21 +167,38 @@ def build_estimate_pdf(
         story.append(Paragraph(escape(" ".join(conditions)), styles["BodyText"]))
         story.append(Spacer(1, 4 * mm))
 
-    rows = [["Descrizione", "Q.tà", "Ricambi / mat.", "Ore", "Manodopera", "IVA", "Imponibile", "Totale"]]
-    for line in lines:
-        amounts = price_line(line, terms)
-        hours = line.labor_hours + line.paint_hours
-        rows.append([
-            Paragraph(escape(line.description), styles["Cell"]),
-            f"{line.quantity:g}",
-            euro(amounts.parts),
-            f"{hours:g}",
-            "Inclusa" if terms.labor_included and hours else euro(amounts.labor),
-            f"{line.vat_rate:g}%",
-            euro(amounts.subtotal),
-            euro(amounts.total),
-        ])
-    table = Table(rows, repeatRows=1, colWidths=[52 * mm, 10 * mm, 23 * mm, 10 * mm, 22 * mm, 11 * mm, 25 * mm, 25 * mm])
+    if terms.labor_included:
+        # Labor is in the monthly fee: the customer sees parts and materials only, no hours or labor columns.
+        lines = customer_document_lines(lines, terms)
+        rows = [["Descrizione", "Q.tà", "Ricambi / materiali", "IVA", "Imponibile", "Totale"]]
+        for line in lines:
+            amounts = price_line(line, terms)
+            rows.append([
+                Paragraph(escape(line.description), styles["Cell"]),
+                f"{line.quantity:g}",
+                euro(amounts.parts),
+                f"{line.vat_rate:g}%",
+                euro(amounts.subtotal),
+                euro(amounts.total),
+            ])
+        widths = [72 * mm, 12 * mm, 30 * mm, 14 * mm, 25 * mm, 25 * mm]
+    else:
+        rows = [["Descrizione", "Q.tà", "Ricambi / mat.", "Ore", "Manodopera", "IVA", "Imponibile", "Totale"]]
+        for line in lines:
+            amounts = price_line(line, terms)
+            hours = line.labor_hours + line.paint_hours
+            rows.append([
+                Paragraph(escape(line.description), styles["Cell"]),
+                f"{line.quantity:g}",
+                euro(amounts.parts),
+                f"{hours:g}",
+                euro(amounts.labor),
+                f"{line.vat_rate:g}%",
+                euro(amounts.subtotal),
+                euro(amounts.total),
+            ])
+        widths = [52 * mm, 10 * mm, 23 * mm, 10 * mm, 22 * mm, 11 * mm, 25 * mm, 25 * mm]
+    table = Table(rows, repeatRows=1, colWidths=widths)
     style = _grid_style()
     style.add("ALIGN", (1, 1), (-1, -1), "RIGHT")
     table.setStyle(style)

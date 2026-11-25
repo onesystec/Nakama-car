@@ -64,3 +64,14 @@ def price_line(line, terms: PricingTerms = PUBLIC_TERMS) -> LineAmounts:
     subtotal = parts + labor
     vat = money(subtotal * Decimal(line.vat_rate) / HUNDRED)
     return LineAmounts(parts=parts, labor=labor, subtotal=subtotal, vat=vat, total=subtotal + vat)
+
+
+def customer_document_lines(lines, terms: PricingTerms) -> list:
+    """Lines shown to the customer. With a contract that includes labor (monthly fee), labor-only lines
+    (hours, nothing to pay) are left out: the customer sees only parts and materials."""
+    if not terms.labor_included:
+        return list(lines)
+    return [
+        line for line in lines
+        if not ((Decimal(line.labor_hours) + Decimal(line.paint_hours)) > 0 and price_line(line, terms).parts == 0)
+    ]

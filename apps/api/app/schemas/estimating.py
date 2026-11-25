@@ -35,6 +35,7 @@ class EstimateLineCreate(BaseModel):
     operation: str | None = None
     part: str | None = None
     oem_code: str | None = None
+    supplier: str | None = Field(default=None, max_length=120)
     description: str
     quantity: Decimal = Field(default=Decimal("1"), ge=0)
     unit_price: Decimal = Field(default=Decimal("0"), ge=0)

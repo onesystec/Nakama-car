@@ -124,3 +124,67 @@ def test_company_details_fall_back_to_nakama_car():
     custom = company_profile(SimpleNamespace(company_name="Officina Rossi", address="", vat_number="123", phone="02 1234"))
     assert custom["company_name"] == "Officina Rossi" and custom["vat_number"] == "123"
     assert custom["address"] == "Via A. Manzoni 58" and custom["phone"] == "02 1234"
+
+
+def test_supplier_is_kept_for_the_workshop_but_not_shown_to_the_customer(client):
+    import test_fleet_billing as fleet
+
+    c, _, _ = client
+    _, _, _, case = fleet.create_fleet_case(c, plate="SU123PL")
+    estimate = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    base = f"/api/v1/estimates/{estimate['id']}"
+    line = c.post(f"{base}/lines", json={
+        "category": "PART", "description": "Radiatore", "unit_price": 100, "supplier": "Ricambi Rossi Monza",
+    }).json()
+    assert line["supplier"] == "Ricambi Rossi Monza"
+    assert c.get(f"{base}/lines").json()[0]["supplier"] == "Ricambi Rossi Monza"
+    assert "Ricambi Rossi Monza" not in c.get(f"{base}/preview").text
+    assert b"Ricambi Rossi" not in c.get(f"{base}/pdf").content
+
+
+def test_contract_with_labor_included_shows_only_parts_to_the_customer(client):
+    import test_fleet_billing as fleet
+
+    c, _, _ = client
+    _, _, _, case = fleet.create_fleet_case(c, plate="CO123NT")  # contract: labor included
+    estimate = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    base = f"/api/v1/estimates/{estimate['id']}"
+    c.post(f"{base}/lines", json={"category": "PART", "description": "Pastiglie", "unit_price": 80, "vat_rate": 22})
+    c.post(f"{base}/lines", json={"category": "MECHANICAL_LABOR", "description": "Manodopera", "labor_hours": 3, "labor_rate": 50, "vat_rate": 22})
+    preview = c.get(f"{base}/preview").json()
+    assert preview["labor_included"] is True
+    assert [line["description"] for line in preview["lines"]] == ["Pastiglie"]
+    # The workshop editor still has every line.
+    assert len(c.get(f"{base}/lines").json()) == 2
+
+    # Without the contract (public price list) labor is charged and shown.
+    assert c.patch(f"{base}/pricing", json={"apply_contract": False}).status_code == 200
+    assert [line["description"] for line in c.get(f"{base}/preview").json()["lines"]] == ["Pastiglie", "Manodopera"]
+
+
+def test_delete_estimate_not_yet_accepted(client):
+    import test_fleet_billing as fleet
+
+    c, _, _ = client
+    _, _, _, case = fleet.create_fleet_case(c, plate="DE123LT")
+    estimate = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    c.post(f"/api/v1/estimates/{estimate['id']}/lines", json={"category": "PART", "description": "Filtro", "unit_price": 10})
+    assert c.delete(f"/api/v1/estimates/{estimate['id']}").status_code == 204
+    assert c.get(f"/api/v1/estimates/{estimate['id']}").status_code == 404
+
+    accepted = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    assert c.patch(f"/api/v1/estimates/{accepted['id']}/status", json={"status": "APPROVED"}).status_code == 200
+    assert c.delete(f"/api/v1/estimates/{accepted['id']}").status_code == 409
+
+
+def test_filter_da_valutare_lists_estimates_waiting_for_an_answer(client):
+    import test_fleet_billing as fleet
+
+    c, _, _ = client
+    _, _, _, case = fleet.create_fleet_case(c, plate="FI123LT")
+    waiting = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    refused = c.post("/api/v1/estimates", json={"repair_case_id": case["id"]}).json()
+    c.patch(f"/api/v1/estimates/{refused['id']}/status", json={"status": "REJECTED"})
+    ids = {item["id"] for item in c.get("/api/v1/estimates?status=PENDING").json()}
+    assert waiting["id"] in ids and refused["id"] not in ids
+    assert c.get("/api/v1/estimates?status=NOPE").status_code == 422

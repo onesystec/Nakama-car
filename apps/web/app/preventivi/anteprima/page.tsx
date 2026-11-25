@@ -136,8 +136,9 @@ export default function EstimatePreviewPage() {
           <table className="sheet-lines">
             <thead>
               <tr>
-                <th>{t("Descrizione")}</th><th>{t("Q.tà")}</th><th>{t("Ricambi / materiali")}</th><th>{t("Ore")}</th>
-                <th>{t("Manodopera")}</th><th>{t("IVA")}</th><th>{t("Imponibile")}</th><th>{t("Totale")}</th>
+                <th>{t("Descrizione")}</th><th>{t("Q.tà")}</th><th>{t("Ricambi / materiali")}</th>
+                {!data.labor_included && <><th>{t("Ore")}</th><th>{t("Manodopera")}</th></>}
+                <th>{t("IVA")}</th><th>{t("Imponibile")}</th><th>{t("Totale")}</th>
               </tr>
             </thead>
             <tbody>
@@ -146,8 +147,8 @@ export default function EstimatePreviewPage() {
                   <td>{line.description}</td>
                   <td>{quantity(line.quantity)}</td>
                   <td>{formatMoney(line.parts)}</td>
-                  <td>{quantity(line.hours)}</td>
-                  <td>{line.labor_included ? t("Inclusa") : formatMoney(line.labor)}</td>
+                  {/* Labor in the monthly fee: only parts and materials are shown. */}
+                  {!data.labor_included && <><td>{quantity(line.hours)}</td><td>{formatMoney(line.labor)}</td></>}
                   <td>{Number(line.vat_rate)}%</td>
                   <td>{formatMoney(Number(line.parts) + Number(line.labor))}</td>
                   <td>{formatMoney(line.total)}</td>

@@ -5,15 +5,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
+from app.models.approval import EstimateApproval
+from app.models.billing import Invoice
 from app.models.contracts import ServiceContract
 from app.models.estimating import Estimate, EstimateLine, EstimateStatus, LaborRate
 from app.models.garage import Customer, RepairCase, Vehicle
 from app.models.identity import TenantSettings
-from app.models.staff import Diagnosis
+from app.models.staff import Diagnosis, DiagnosisStatus
+from app.models.workshop import WorkOrder
 from app.schemas.estimating import (
     EstimateCreate,
     EstimateLineCreate,
@@ -31,7 +34,7 @@ from app.services.contracts import customer_display_name, find_active_contract
 from app.services.numbering import next_number
 from app.services.company import company_lines, company_profile
 from app.services.pdf import build_estimate_pdf, customer_name as pdf_customer_name
-from app.services.pricing import PUBLIC_TERMS, PricingTerms, money, price_line
+from app.services.pricing import PUBLIC_TERMS, PricingTerms, customer_document_lines, money, price_line
 from app.services.workshop import open_work_order
 from app.services.vehicle_names import short_vehicle_name
 
@@ -186,7 +189,7 @@ def create_estimate(
 @router.get("/estimates", response_model=list[EstimateListItem])
 def list_estimates(
     q: str = "",
-    status_filter: EstimateStatus | None = Query(None, alias="status"),
+    status_filter: str | None = Query(None, alias="status"),
     repair_case_id: UUID | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
@@ -201,8 +204,14 @@ def list_estimates(
         .outerjoin(ServiceContract, ServiceContract.id == Estimate.contract_id)
         .where(Estimate.tenant_id == auth.tenant_id, RepairCase.tenant_id == auth.tenant_id)
     )
-    if status_filter is not None:
-        query = query.where(Estimate.status == status_filter)
+    if status_filter == "PENDING":
+        # "Da valutare": everything still waiting for an answer.
+        query = query.where(Estimate.status.not_in([EstimateStatus.APPROVED, EstimateStatus.REJECTED]))
+    elif status_filter:
+        try:
+            query = query.where(Estimate.status == EstimateStatus(status_filter))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid status")
     if repair_case_id is not None:
         query = query.where(Estimate.repair_case_id == repair_case_id)
     if q.strip():
@@ -480,6 +489,40 @@ def update_estimate_line(
     return line_read(line, terms_of(estimate))
 
 
+@router.delete("/estimates/{estimate_id}", status_code=204)
+def delete_estimate(
+    estimate_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_permission("estimate.create")),
+):
+    """Delete an estimate not yet accepted, with its lines and links. Accepted ones, or ones with an
+    invoice or a work order, stay: they are part of the job's history."""
+    estimate = get_tenant_estimate(db, auth.tenant_id, estimate_id)
+    if estimate.status == EstimateStatus.APPROVED:
+        raise HTTPException(status_code=409, detail="Il preventivo accettato non si può eliminare.")
+    if db.scalar(select(Invoice.id).where(Invoice.estimate_id == estimate.id).limit(1)) or db.scalar(
+        select(WorkOrder.id).where(WorkOrder.estimate_id == estimate.id).limit(1)
+    ):
+        raise HTTPException(status_code=409, detail="Il preventivo ha una fattura o un ordine di lavoro: non si può eliminare.")
+    record_audit(
+        db,
+        tenant_id=auth.tenant_id,
+        user_id=auth.user_id,
+        entity_type="estimate",
+        entity_id=estimate.id,
+        action="deleted",
+        old_value={"estimate_number": estimate.estimate_number, "total": str(estimate.total), "status": estimate.status.value},
+    )
+    for line in db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == estimate.id)).all():
+        db.delete(line)
+    for approval in db.scalars(select(EstimateApproval).where(EstimateApproval.estimate_id == estimate.id)).all():
+        db.delete(approval)
+    # The diagnosis it came from goes back to the office's list, to make a new estimate.
+    db.execute(update(Diagnosis).where(Diagnosis.estimate_id == estimate.id).values(estimate_id=None, status=DiagnosisStatus.SENT))
+    db.delete(estimate)
+    db.commit()
+
+
 @router.delete("/estimates/{estimate_id}/lines/{line_id}", status_code=204)
 def delete_estimate_line(
     estimate_id: UUID,
@@ -549,7 +592,8 @@ def estimate_document(db: Session, tenant_id: UUID, estimate_id: UUID) -> dict:
     contract = db.get(ServiceContract, estimate.contract_id) if estimate.contract_id else None
     return {
         "estimate": estimate,
-        "lines": lines,
+        # What the customer sees: with labor in the monthly fee, only parts and materials.
+        "lines": customer_document_lines(lines, terms_of(estimate)),
         "customer": customer,
         "vehicle": vehicle,
         "settings": settings,
