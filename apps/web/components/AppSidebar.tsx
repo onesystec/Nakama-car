@@ -20,6 +20,7 @@ const navigation = [
   ["/officina", "⚒ Il mio lavoro", "wrench", "work_order.read"],
   ["/fatture", "◫ Fatture", "invoice", "invoice.read"],
   ["/costi", "▥ Costi officina", "costs", "invoice.create"],
+  ["/magazzino", "▣ Magazzino", "box", "work_order.read"],
   ["/clienti", "◎ Clienti", "clients", "customer.read"],
   ["/veicoli", "◇ Veicoli", "car", "vehicle.read"],
   ["/personale", "♙ Personale", "people", "users.manage"],
@@ -28,7 +29,7 @@ const navigation = [
 ];
 // Workshop staff (mechanic / body shop) see their menu in the order they work.
 // «Lavori in officina» (/lavori) is not a separate entry: it is a view inside «Il mio lavoro» / «Lavori in corso».
-const workerOrder = ["/diagnosi", "/preventivi", "/pratiche", "/officina", "/taller-3d"];
+const workerOrder = ["/diagnosi", "/preventivi", "/pratiche", "/officina", "/magazzino", "/taller-3d"];
 const settings = [
   ["/profilo", "☺ Il mio profilo", "profile", ""],
   ["/configurazione", "⚙ Impostazioni", "settings", "settings.manage"],

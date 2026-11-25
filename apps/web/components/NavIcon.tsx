@@ -8,6 +8,7 @@ const paths: Record<string, ReactNode> = {
   estimate: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 7h8M8 11h2m4 0h2m-8 4h2m4 0h2m-8 3h2m4 0h2" /></>,
   work: <path d="M14 4a6 6 0 0 0-7 8L3 16a3 3 0 0 0 4 4l5-5a6 6 0 0 0 8-7l-4 4-4-4 4-4Z" />,
   costs: <><path d="M4 20V10m6 10V4m6 16v-7m4 7H2" /></>,
+  box: <><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z" /><path d="M3 7.5 12 12l9-4.5M12 12v9M7.5 5.2l9 4.6" /></>,
   invoice: <><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3Z" /><path d="M8 7h8M8 11h8m-8 4h4" /></>,
   people: <><rect x="3" y="4" width="18" height="17" rx="2" /><circle cx="12" cy="10" r="3" /><path d="M7 19v-1a5 5 0 0 1 10 0v1M8 2v4m8-4v4" /></>,
   settings: <><path d="M3 6h18M3 12h18M3 18h18" /><path d="M8 3v6m8 0v6M8 15v6" /></>,

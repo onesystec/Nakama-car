@@ -2,6 +2,7 @@ from app.models.datev import DatevLink
 from app.models.approval import EstimateApproval
 from app.models.billing import Invoice, InvoiceLine
 from app.models.costs import WorkshopExpense
+from app.models.inventory import InventoryItem, InventoryMovement
 from app.models.contracts import ServiceContract, ServiceContractDocument
 from app.models.lookup import VehicleLookup
 from app.models.technical import TechnicalSheet
@@ -23,5 +24,5 @@ __all__ = [
     "VehicleArea", "Damage", "LaborRate", "Estimate", "EstimateLine", "EstimateApproval",
     "WorkOrder", "WorkOrderTask", "Invoice", "InvoiceLine", "ServiceContract", "ServiceContractDocument", "VehicleLookup", "TechnicalSheet", "VehicleRender", "DamageMarker",
     "CaseTrackingLink", "CaseMessage", "PortalAccount", "PortalServiceRequest", "PlateSpot", "ApiKey", "ExternalCredential", "VehicleTelemetry",
-    "Diagnosis", "DiagnosisLine", "QuickItem", "UserProfile", "WorkshopExpense",
+    "Diagnosis", "DiagnosisLine", "QuickItem", "UserProfile", "WorkshopExpense", "InventoryItem", "InventoryMovement",
 ]
