@@ -43,13 +43,14 @@ def test_stock_in_out_count_and_value(client):
     assert data["totals"]["BODY"]["low"] == 1
 
     history = c.get(f"/api/v1/inventory/movements?item_id={filtro['id']}").json()
-    assert [m["kind"] for m in history][-1] == "IN" and len(history) == 4
+    assert sorted(m["kind"] for m in history) == ["ADJUST", "IN", "IN", "OUT"]
     assert [m["note"] for m in history if m["kind"] == "IN"].count("Giacenza iniziale") == 1
     for_case = c.get(f"/api/v1/inventory/movements?repair_case_id={case['id']}").json()
     assert len(for_case) == 1 and for_case[0]["case_number"] == case["case_number"]
 
     # Undo the rettifica: back to 3.
-    undo = c.delete(f"/api/v1/inventory/movements/{history[0]['id']}")
+    adjust = next(m for m in history if m["kind"] == "ADJUST")
+    undo = c.delete(f"/api/v1/inventory/movements/{adjust['id']}")
     assert undo.status_code == 204
     assert next(i for i in c.get("/api/v1/inventory").json()["items"] if i["id"] == filtro["id"])["quantity"] == "3"
 
