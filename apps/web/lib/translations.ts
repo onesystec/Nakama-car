@@ -2020,3 +2020,40 @@ export function translate(text: string, language: Language): string {
   if (Object.prototype.hasOwnProperty.call(codes, text)) return codes[text][language === "es" ? 1 : 0];
   return language === "es" && Object.prototype.hasOwnProperty.call(spanish, text) ? spanish[text] : text;
 }
+
+// Worker's personal sheet (Il mio profilo / Personale → Scheda): details and personal documents.
+Object.assign(spanish, {
+  "Dati anagrafici": "Datos personales",
+  "Luogo di nascita": "Lugar de nacimiento",
+  "Residenza": "Residencia",
+  "Pagamento stipendio": "Pago del sueldo",
+  "IBAN": "IBAN",
+  "Documenti personali": "Documentos personales",
+  "Visibili solo a te e all’amministrazione.": "Solo los ves tú y la administración.",
+  "Visibili solo al lavoratore e all’amministrazione.": "Solo los ven el trabajador y la administración.",
+  "Nessun documento. Carica carta d’identità, patente, contratto o attestati (PDF, foto o Word).": "Ningún documento. Sube DNI, carné de conducir, contrato o certificados (PDF, foto o Word).",
+  "Documento d’identità": "Documento de identidad",
+  "Patente": "Carné de conducir",
+  "Attestato o certificato": "Certificado",
+  "Altro": "Otro",
+  "Tipo di documento": "Tipo de documento",
+  "Scadenza (facoltativa)": "Caducidad (opcional)",
+  "Scade il": "Caduca el",
+  "Scaduto il": "Caducado el",
+  "caricato dal lavoratore": "subido por el trabajador",
+  "caricato dall’amministrazione": "subido por la administración",
+  "+ Carica documento": "+ Subir documento",
+  "Eliminare il documento": "¿Eliminar el documento",
+  "Chiudi scheda": "Cerrar ficha",
+  "Impossibile scaricare il file.": "No se pudo descargar el archivo.",
+  "Impossibile eliminare il file.": "No se pudo eliminar el archivo.",
+  "Compila i tuoi dati e carica i documenti che ti chiede l’ufficio. Li vedete solo tu e l’amministrazione.": "Rellena tus datos y sube los documentos que te pida la oficina. Solo los veis tú y la administración.",
+  "Codice fiscale non valido": "Código fiscal no válido",
+  "IBAN non valido": "IBAN no válido",
+  "IBAN non valido: controlla le cifre": "IBAN no válido: revisa los dígitos",
+  "Data di nascita non valida": "Fecha de nacimiento no válida",
+  "Formato non accettato: carica un PDF, una foto (JPG, PNG, HEIC) o un file Word.": "Formato no aceptado: sube un PDF, una foto (JPG, PNG, HEIC) o un archivo Word.",
+  "Il file non corrisponde al formato indicato.": "El archivo no corresponde al formato indicado.",
+  "Questo documento è stato caricato dall’amministrazione: solo lei può eliminarlo.": "Este documento lo subió la administración: solo ella puede eliminarlo.",
+  "Controlla i dati inseriti.": "Revisa los datos introducidos.",
+});

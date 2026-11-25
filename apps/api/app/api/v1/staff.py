@@ -1,5 +1,6 @@
 """Workshop staff: my profile, quick diagnoses for the office, my work (tasks as buttons)."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from urllib.parse import quote
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID, uuid4
@@ -17,10 +18,10 @@ from app.models.estimating import Estimate, EstimateLine, EstimateLineCategory, 
 from app.models.garage import Customer, RepairCase, RepairCaseStatus, Vehicle
 from app.models.identity import User
 from app.models.media import DB_STORAGE_PREFIX, Media, MediaCategory, MediaType
-from app.models.staff import Diagnosis, DiagnosisLine, DiagnosisStatus, QuickItem, UserProfile
+from app.models.staff import Diagnosis, DiagnosisLine, DiagnosisStatus, QuickItem, StaffDocument, UserProfile
 from app.models.workshop import WorkOrder, WorkOrderStatus, WorkOrderTask, WorkTaskStatus
 from app.schemas.estimating import EstimateLineCreate
-from app.security.context import AuthContext, get_auth_context, require_permission
+from app.security.context import AuthContext, get_auth_context, is_admin, require_permission
 from app.services import staff
 from app.services.audit import record_audit
 from app.services.numbering import next_number
@@ -46,9 +47,16 @@ ESTIMATE_STAGE = {
 # ---------- my profile ----------
 
 class ProfileUpdate(BaseModel):
-    # Only what the workshop needs to work with someone (GDPR data minimisation): birth date, tax code
-    # and home address are kept by payroll, not here.
+    """Personal details of a worker. Every field is optional: the worker fills what the office needs
+    (contract, payroll, emergencies); the administration can complete it too."""
     phone: str | None = Field(default=None, max_length=32)
+    birth_date: date | None = None
+    birth_place: str | None = Field(default=None, max_length=120)
+    tax_code: str | None = Field(default=None, max_length=32)
+    address: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    postal_code: str | None = Field(default=None, max_length=16)
+    iban: str | None = Field(default=None, max_length=42)
     emergency_contact: str | None = Field(default=None, max_length=160)
     emergency_phone: str | None = Field(default=None, max_length=32)
     skills: str | None = Field(default=None, max_length=2000)
@@ -62,18 +70,62 @@ class ProfileUpdate(BaseModel):
             return value or None
         return value
 
+    @field_validator("tax_code")
+    @classmethod
+    def clean_tax_code(cls, value):
+        if value is None:
+            return None
+        value = "".join(value.split()).upper()
+        # Italian codice fiscale (16 characters) or a 11-digit number; foreign workers may have other codes.
+        if not value.isalnum() or not 8 <= len(value) <= 20:
+            raise ValueError("Codice fiscale non valido")
+        if len(value) == 16 and not (value[:6].isalpha() and value[6:8].isdigit()):
+            raise ValueError("Codice fiscale non valido")
+        return value
+
+    @field_validator("iban")
+    @classmethod
+    def clean_iban(cls, value):
+        if value is None:
+            return None
+        value = "".join(value.split()).upper()
+        if not (15 <= len(value) <= 34 and value[:2].isalpha() and value[2:4].isdigit() and value.isalnum()):
+            raise ValueError("IBAN non valido")
+        digits = "".join(str(int(ch, 36)) for ch in value[4:] + value[:4])
+        if int(digits) % 97 != 1:
+            raise ValueError("IBAN non valido: controlla le cifre")
+        return value
+
+    @field_validator("birth_date")
+    @classmethod
+    def plausible_birth_date(cls, value):
+        if value is not None and not date(1900, 1, 1) <= value <= date.today():
+            raise ValueError("Data di nascita non valida")
+        return value
+
 
 PROFILE_FIELDS = list(ProfileUpdate.model_fields)
 
 
 def profile_dict(profile: UserProfile | None) -> dict:
-    return {field: getattr(profile, field) if profile else None for field in PROFILE_FIELDS} | {
-        "work_area": profile.work_area if profile else None,
-    }
+    data = {field: getattr(profile, field) if profile else None for field in PROFILE_FIELDS}
+    if data["birth_date"] is not None:
+        data["birth_date"] = data["birth_date"].isoformat()
+    return data | {"work_area": profile.work_area if profile else None}
 
 
 def get_profile(db: Session, user_id) -> UserProfile | None:
     return db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+
+
+def save_profile(db: Session, user_id, payload: ProfileUpdate) -> UserProfile:
+    profile = get_profile(db, user_id)
+    if profile is None:
+        profile = UserProfile(user_id=user_id)
+        db.add(profile)
+    for field, value in payload.model_dump().items():
+        setattr(profile, field, value)
+    return profile
 
 
 def me_dict(db: Session, auth: AuthContext) -> dict:
@@ -94,12 +146,7 @@ def me(db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_conte
 
 @router.put("/me/profile")
 def update_my_profile(payload: ProfileUpdate, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
-    profile = get_profile(db, auth.user_id)
-    if profile is None:
-        profile = UserProfile(user_id=auth.user_id)
-        db.add(profile)
-    for field, value in payload.model_dump().items():
-        setattr(profile, field, value)
+    save_profile(db, auth.user_id, payload)
     db.commit()
     return me_dict(db, auth)
 
@@ -126,6 +173,22 @@ def user_profile(user_id: UUID, db: Session = Depends(get_db), auth: AuthContext
             "roles": roles, "work_area": staff.area_for(roles, profile), "profile": profile_dict(profile)}
 
 
+@router.put("/users/{user_id}/profile")
+def update_user_profile(user_id: UUID, payload: ProfileUpdate, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage"))):
+    """The administration completes or corrects a worker's personal details."""
+    user = tenant_user(db, auth, user_id)
+    before = profile_dict(get_profile(db, user.id))
+    save_profile(db, user.id, payload)
+    db.flush()
+    after = profile_dict(get_profile(db, user.id))
+    changed = sorted(field for field in PROFILE_FIELDS if before[field] != after[field])
+    if changed:  # which fields, never their values (personal data stays out of the audit log)
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="user", entity_id=user.id,
+                     action="PROFILE_UPDATED", new_value={"changed_fields": changed})
+    db.commit()
+    return user_profile(user_id, db, auth)
+
+
 @router.put("/users/{user_id}/area")
 def set_user_area(user_id: UUID, payload: StaffAreaUpdate, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage"))):
     """Main account decides whether a worker is meccanica or carrozzeria (ALL = both)."""
@@ -137,6 +200,144 @@ def set_user_area(user_id: UUID, payload: StaffAreaUpdate, db: Session = Depends
     profile.work_area = payload.work_area
     db.commit()
     return user_profile(user_id, db, auth)
+
+
+# ---------- personal documents (only the worker and the administration) ----------
+
+DOCUMENT_KINDS = ("IDENTITY", "DRIVING_LICENSE", "CONTRACT", "CERTIFICATE", "OTHER")
+MAX_DOCUMENTS_PER_USER = 40
+# PDF, photos/scans and Word: what an ID card, a licence, a contract or a certificate comes as.
+DOCUMENT_TYPES = {
+    "application/pdf": b"%PDF",
+    "image/jpeg": b"\xff\xd8\xff",
+    "image/png": b"\x89PNG",
+    "image/webp": b"RIFF",
+    "image/heic": None, "image/heif": None,
+    "application/msword": b"\xd0\xcf\x11\xe0",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": b"PK",
+}
+
+
+def staff_document_dict(document: StaffDocument) -> dict:
+    return {
+        "id": str(document.id), "kind": document.kind, "filename": document.filename, "content_type": document.content_type,
+        "size_bytes": document.size_bytes, "expires_on": document.expires_on.isoformat() if document.expires_on else None,
+        "uploaded_by": str(document.uploaded_by) if document.uploaded_by else None,
+        "uploaded_by_me": None, "created_at": document.created_at.isoformat() if document.created_at else None,
+    }
+
+
+def list_documents_of(db: Session, auth: AuthContext, owner_id: UUID) -> list[dict]:
+    documents = db.scalars(select(StaffDocument).where(StaffDocument.user_id == owner_id, StaffDocument.tenant_id == auth.tenant_id)
+                           .order_by(StaffDocument.created_at.desc())).all()
+    return [staff_document_dict(document) | {"uploaded_by_me": document.uploaded_by == auth.user_id} for document in documents]
+
+
+def document_of(db: Session, auth: AuthContext, owner_id: UUID, document_id: UUID) -> StaffDocument:
+    document = db.scalar(select(StaffDocument).where(
+        StaffDocument.id == document_id, StaffDocument.user_id == owner_id, StaffDocument.tenant_id == auth.tenant_id,
+    ))
+    if document is None:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+    return document
+
+
+async def add_document(request: Request, db: Session, auth: AuthContext, owner_id: UUID, filename: str, kind: str, expires_on: date | None) -> dict:
+    if kind not in DOCUMENT_KINDS:
+        raise HTTPException(status_code=422, detail="Tipo di documento non valido")
+    count = db.scalar(select(func.count(StaffDocument.id)).where(StaffDocument.user_id == owner_id, StaffDocument.tenant_id == auth.tenant_id)) or 0
+    if count >= MAX_DOCUMENTS_PER_USER:
+        raise HTTPException(status_code=409, detail=f"Massimo {MAX_DOCUMENTS_PER_USER} documenti per persona")
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if content_type not in DOCUMENT_TYPES:
+        raise HTTPException(status_code=415, detail="Formato non accettato: carica un PDF, una foto (JPG, PNG, HEIC) o un file Word.")
+    content = await read_body(request, MAX_UPLOAD_BYTES, "File troppo grande (max 15 MB).")
+    if not content:
+        raise HTTPException(status_code=422, detail="Il file è vuoto.")
+    signature = DOCUMENT_TYPES[content_type]
+    if signature is not None and not content.startswith(signature):
+        raise HTTPException(status_code=415, detail="Il file non corrisponde al formato indicato.")
+    document = StaffDocument(
+        tenant_id=auth.tenant_id, user_id=owner_id, kind=kind, filename=filename.strip().replace("/", "_").replace("\\", "_")[:255] or "documento",
+        content_type=content_type, size_bytes=len(content), expires_on=expires_on, uploaded_by=auth.user_id, content=content,
+    )
+    db.add(document)
+    db.flush()
+    record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="user", entity_id=owner_id,
+                 action="DOCUMENT_ADDED", new_value={"document_id": str(document.id), "kind": kind})
+    db.commit()
+    db.refresh(document)
+    return staff_document_dict(document) | {"uploaded_by_me": True}
+
+
+def download_document(db: Session, auth: AuthContext, owner_id: UUID, document_id: UUID) -> Response:
+    document = document_of(db, auth, owner_id, document_id)
+    if owner_id != auth.user_id:  # who looked at someone else's document (GDPR accountability)
+        record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="user", entity_id=owner_id,
+                     action="DOCUMENT_VIEWED", new_value={"document_id": str(document.id), "kind": document.kind})
+        db.commit()
+    return Response(content=document.content, media_type=document.content_type, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(document.filename)}",
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",
+    })
+
+
+def remove_document(db: Session, auth: AuthContext, owner_id: UUID, document_id: UUID, admin: bool) -> Response:
+    document = document_of(db, auth, owner_id, document_id)
+    # The worker removes what they uploaded; what the office uploaded (e.g. the contract) only the office.
+    if not admin and document.uploaded_by != auth.user_id:
+        raise HTTPException(status_code=403, detail="Questo documento è stato caricato dall’amministrazione: solo lei può eliminarlo.")
+    record_audit(db, tenant_id=auth.tenant_id, user_id=auth.user_id, entity_type="user", entity_id=owner_id,
+                 action="DOCUMENT_DELETED", old_value={"document_id": str(document.id), "kind": document.kind})
+    db.delete(document)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/me/documents")
+def my_documents(db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
+    return list_documents_of(db, auth, auth.user_id)
+
+
+@router.post("/me/documents", status_code=status.HTTP_201_CREATED)
+async def upload_my_document(
+    request: Request, filename: str = Query(min_length=1, max_length=255), kind: str = Query("OTHER"), expires_on: date | None = Query(None),
+    db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context),
+):
+    return await add_document(request, db, auth, auth.user_id, filename, kind, expires_on)
+
+
+@router.get("/me/documents/{document_id}")
+def read_my_document(document_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
+    return download_document(db, auth, auth.user_id, document_id)
+
+
+@router.delete("/me/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_document(document_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth_context)):
+    return remove_document(db, auth, auth.user_id, document_id, admin=is_admin(auth))
+
+
+@router.get("/users/{user_id}/documents")
+def user_documents(user_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage"))):
+    return list_documents_of(db, auth, tenant_user(db, auth, user_id).id)
+
+
+@router.post("/users/{user_id}/documents", status_code=status.HTTP_201_CREATED)
+async def upload_user_document(
+    user_id: UUID, request: Request, filename: str = Query(min_length=1, max_length=255), kind: str = Query("OTHER"),
+    expires_on: date | None = Query(None), db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage")),
+):
+    return await add_document(request, db, auth, tenant_user(db, auth, user_id).id, filename, kind, expires_on)
+
+
+@router.get("/users/{user_id}/documents/{document_id}")
+def read_user_document(user_id: UUID, document_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage"))):
+    return download_document(db, auth, tenant_user(db, auth, user_id).id, document_id)
+
+
+@router.delete("/users/{user_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_document(user_id: UUID, document_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_permission("users.manage"))):
+    return remove_document(db, auth, tenant_user(db, auth, user_id).id, document_id, admin=True)
 
 
 # ---------- quick-add list (workshop's own items) ----------

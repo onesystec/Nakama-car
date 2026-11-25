@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db.deps import get_db
 from app.models.identity import Role, User, UserRole, UserStatus, UserTenant, Tenant
-from app.models.staff import UserProfile
+from app.models.staff import StaffDocument, UserProfile
 from app.schemas.users import UserCreate, UserRead, UserUpdate
 from app.security.context import AuthContext, require_permission
 from app.services.staff import user_area
@@ -218,5 +218,6 @@ def delete_user(
     db.execute(delete(UserRole).where(UserRole.user_id == user_id))
     db.execute(delete(UserTenant).where(UserTenant.user_id == user_id))
     db.execute(delete(UserProfile).where(UserProfile.user_id == user_id))
+    db.execute(delete(StaffDocument).where(StaffDocument.user_id == user_id))
     db.delete(user)
     db.commit()
