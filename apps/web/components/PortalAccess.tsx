@@ -119,7 +119,7 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
   return (
     <div className="portal-access">
       <h3>{t("Accessi al portale")}</h3>
-      <p className="hint">{t("Il cliente entra da")} <a href="/portale/login" target="_blank" rel="noopener noreferrer">{portalUrl}</a> {t("e vede i suoi veicoli, i lavori in corso, le prossime manutenzioni e lo storico; può scrivervi in chat.")}</p>
+      <p className="hint"><a href="/portale/login" target="_blank" rel="noopener noreferrer">{portalUrl}</a></p>
       {message && <p className="hint" role="status">{t(message)}</p>}
       {issued?.temporary_password && (
         <div className="issued-password" role="status">
@@ -154,7 +154,6 @@ export function PortalAccess({ customerId, customerName }: { customerId: string;
       </ul>
       {canWrite && <form className="record-form portal-account-form" onSubmit={invite}>
         <h4>{label("Invita al portale", "Invitar al portal")}</h4>
-        <p className="hint">{label("Invia il link al cliente. Sarà lui a inserire i dati e creare l’accesso.", "Envía el enlace al cliente. Él completará los datos y creará su acceso.")}</p>
         <div className="record-form-actions"><button className="primary" disabled={busy}>{label("Genera link", "Generar enlace")}</button></div>
         {invitation && <div className="issued-password">
           <label>{label("Link di registrazione", "Enlace de registro")}

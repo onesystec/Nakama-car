@@ -529,7 +529,7 @@ function EstimateEditor({ id, summary, onClose, onChanged }: { id: string; summa
           <span>{t("Tipo")}</span><span>{t("Descrizione")}</span><span>{t("Q.tà")}</span><span>{t("Prezzo ricambio")}</span><span title={t("Ricarico sul costo del ricambio: solo per l’officina, non compare nel preventivo del cliente.")}className="internal-head">{t("Ricarico %")}</span><span>{t("Sconto %")}</span>
           <span>{t("Ore")}</span><span>{t("€/h")}</span><span>{t("Ore vernice")}</span><span>{t("Materiali")}</span><span>{t("IVA %")}</span><span className="num">{t("Imponibile")}</span><span className="num">{t("Totale")}</span><span />
         </div>
-        {lines.length === 0 && <div className="empty-state">{t("Nessuna riga. Aggiungi ricambi e manodopera.")}</div>}
+        {lines.length === 0 && <div className="empty-state">{t("Nessuna riga.")}</div>}
         {lines.map((line, index) => (
           <div className={`line-row${priced[index].missing.size ? " unpriced" : ""}${priced[index].dirty && !locked ? " dirty" : ""}`} role="row" key={line.id || `new-${index}`}>
             <select aria-label={t("Tipo")} disabled={locked} value={line.category} onChange={(e) => update(index, { category: e.target.value })}>
@@ -607,7 +607,6 @@ function SharePanel({ shared, copied, onCopy, onClose }: { shared: Shared; copie
         <a className="button-link secondary" href={shared.url} target="_blank" rel="noopener noreferrer">{t("Anteprima")}</a>
       </div>
       {!phone && !shared.customer_email && <p className="hint">{t("Il cliente non ha telefono né email: aggiungili in Clienti per inviare direttamente.")}</p>}
-      <p className="hint">{t("Quando il cliente approva, il lavoro compare subito al meccanico in «Il mio lavoro».")}</p>
     </section>
   );
 }

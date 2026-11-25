@@ -141,10 +141,6 @@ export default function FatturePage() {
             </label>
             <button className="secondary">{t("Cerca")}</button>
           </form>
-          <p className="hint">{words(
-            "Si possono eliminare solo le bozze (mai emesse). Una fattura emessa resta registrata per legge: si annulla con una nota di credito.",
-            "Solo se pueden eliminar los borradores (nunca emitidos). Una factura emitida queda registrada por ley: se anula con una nota de crédito.",
-          )}</p>
           {error && <div className="record-error" role="alert">{t(error)}</div>}
           {notice && <p className="staff-success" role="status">{notice}</p>}
           {totals > 0 && <p className="section-intro">{t("Da incassare (fatture emesse in elenco)")}: <strong>{formatMoney(totals)}</strong></p>}
@@ -288,7 +284,6 @@ function InvoiceEditor({ id, onClose, onChanged, onDelete }: { id: string; onClo
             <label className="span-2">{t("Note in fattura")}<textarea disabled={!canEdit || invoice.status === "CANCELLED"} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
             {canEdit && invoice.status !== "CANCELLED" && <div className="record-form-actions"><button className="primary">{t("Salva")}</button></div>}
           </form>
-          <p className="hint">{t("L'XML va caricato sul portale Fatture e Corrispettivi dell'Agenzia delle Entrate o inviato tramite il tuo intermediario. Per generarlo servono i dati fiscali dell'officina (Impostazioni) e del cliente.")}</p>
         </>
       )}
     </section>

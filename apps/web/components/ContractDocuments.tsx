@@ -72,7 +72,7 @@ export function ContractDocuments({ contractId, canWrite }: { contractId: string
   return (
     <div className="contract-documents">
       <span className="contract-documents-title">{words("Documenti del contratto", "Documentos del contrato")}</span>
-      {items.length === 0 && <small className="hint">{words("Nessun file. Carica il contratto firmato o gli allegati (PDF, foto, Word, Excel).", "Ningún archivo. Sube el contrato firmado o los anexos (PDF, fotos, Word, Excel).")}</small>}
+      {items.length === 0 && <small className="hint">{words("Nessun file.", "Ningún archivo.")}</small>}
       {items.map((item) => (
         <span className="contract-document" key={item.id}>
           <button type="button" className="ghost" onClick={() => download(item)}>📄 {item.filename}</button>

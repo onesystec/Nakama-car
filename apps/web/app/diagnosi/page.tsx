@@ -382,7 +382,6 @@ export default function DiagnosiPage() {
       <form className="panel diagnosis-form" onSubmit={send}>
         <div className="panel-head"><div>
           <h2>{editing ? t("Modifica diagnosi") : t("Nuova diagnosi rapida")}</h2>
-          <p>{t("Targa, ore, ricambi e materiali: arriva all'ufficio per fare il preventivo.")}</p>
         </div></div>
         <div className="diagnosis-grid">
           <label className="plate-field">{t("Targa")}
@@ -468,7 +467,7 @@ export default function DiagnosiPage() {
         </div>
 
         <div className="quick-parts">
-          <p className="quick-parts-title"><strong>{t("Aggiunta rapida")}</strong> · {t("cerca e tocca per aggiungere (somma anche le ore)")}</p>
+          <p className="quick-parts-title"><strong>{t("Aggiunta rapida")}</strong></p>
           <QuickPicker items={quickItems} onPick={(item) => addLine(item.kind, item.name, item.hours)} onCreate={createQuick} onDelete={deleteQuick} />
         </div>
 
@@ -561,7 +560,6 @@ export default function DiagnosiPage() {
                       <button type="button" className="ghost" onClick={() => setNewCustomer(null)}>{t("Annulla")}</button>
                       <button className="primary" disabled={!newCustomer.name.trim()}>{t("Crea cliente e preventivo")}</button>
                     </div>
-                    <p className="hint">{t("Gli altri dati (P. IVA, indirizzo…) si completano dopo in Clienti.")}</p>
                   </form>
                 ) : (
                   <button type="button" className="secondary" onClick={() => setNewCustomer({ type: "PRIVATE", name: customerQuery.trim(), last: "", phone: "" })}>＋ {t("Nuovo cliente")}</button>

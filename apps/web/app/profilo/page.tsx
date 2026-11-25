@@ -42,7 +42,6 @@ export default function ProfiloPage() {
               {me.roles.map((role) => <span key={role} className="status-chip">{t(roleNames[role] || role)}</span>)}
               {me.work_area && <span className={`status-chip area-${me.work_area.toLowerCase()}`}>{t("Area")}: {t(areaNames[me.work_area])}</span>}
             </div>
-            <p className="hint">{t("Compila i tuoi dati e carica i documenti che ti chiede l’ufficio. Li vedete solo tu e l’amministrazione.")}</p>
             <button type="button" className="ghost" onClick={() => { clearSession(); window.location.assign("/login"); }}>{t("Esci")}</button>
           </section>
           <div className="panel"><StaffProfileEditor base="/me" admin={false} initial={me.profile} /></div>

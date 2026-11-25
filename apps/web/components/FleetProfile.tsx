@@ -282,7 +282,7 @@ export function FleetProfile({ mode, customerId, query: externalQuery, stateFilt
       )}
 
       {!profile && !error && <p className="hint">{t("Caricamento…")}</p>}
-      {profile && profile.vehicles.length === 0 && <p className="hint">{mode === "staff" ? t("Nessun veicolo: importa la flotta dal file Excel del cliente o aggiungi i veicoli uno a uno.") : t("Nessun veicolo registrato: contatta l'officina.")}</p>}
+      {profile && profile.vehicles.length === 0 && <p className="hint">{t("Nessun veicolo registrato.")}</p>}
       {profile && profile.vehicles.length > 0 && vehicles.length === 0 && <p className="hint">{t("Nessun veicolo trovato.")}</p>}
 
       <div className="fleet-vehicles">

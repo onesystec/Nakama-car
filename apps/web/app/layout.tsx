@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./compact.css";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { LanguageProvider } from "../components/LanguageProvider";
 import { UpdateWatcher } from "../components/UpdateWatcher";

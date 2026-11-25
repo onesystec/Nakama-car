@@ -79,7 +79,6 @@ export default function PortalLoginPage() {
         <div className="auth-copy">
           <p className="eyebrow">{t("AREA CLIENTI FLOTTE")}</p>
           <h1>{t("I tuoi veicoli in officina")}</h1>
-          <p>{t("Stato delle riparazioni, prossime manutenzioni e storico interventi.")}</p>
         </div>
         {temporary ? <PasswordStep temporary={temporary.password} onSave={savePassword} onCancel={() => { setTemporary(null); setPassword(""); }} /> :
         pending ? <LegalStep onAccept={async () => { const ok = await acceptLegal(API_URL, pending); if (ok) { setPending(null); proceed(pending); } return ok; }} onCancel={() => { setPending(null); setPassword(""); }} /> :

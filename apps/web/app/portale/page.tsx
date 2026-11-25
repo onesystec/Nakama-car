@@ -407,14 +407,13 @@ export default function PortalPage() {
               </p>
             )}
             <div className="portal-fleet-list" ref={gridRef}>
-              {me && vehicles.length === 0 && <p className="hint">{t("Nessun veicolo registrato: aggiungilo dal menu o contatta l'officina.")}</p>}
+              {me && vehicles.length === 0 && <p className="hint">{t("Nessun veicolo registrato.")}</p>}
               {me && vehicles.length > 0 && <FleetProfile mode="portal" query={query} stateFilter={stateFilter} onOpenVehicle={openVehicle} />}
             </div>
           </>
         ) : section === "shop" || section === "pickup" ? (
           <section className="portal-section-plain">
             <h2>{t(section === "shop" ? "In manutenzione o riparazione" : "Da ritirare")}</h2>
-            {section === "pickup" && toPickUp.length > 0 && <p className="hint">{t("Questi veicoli sono pronti: puoi passare a ritirarli in officina.")}</p>}
             {search}
             <div className="portal-grid">
               {(section === "shop" ? inRepair : toPickUp).map(card)}

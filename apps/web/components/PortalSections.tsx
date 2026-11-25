@@ -353,7 +353,7 @@ export function PortalChat({ presence, onUnread }: { presence?: ChatPresence; on
 
   return <section className="panel portal-section">
     <h2>{t("Chat con l'officina")}</h2>
-    {conversations && conversations.length === 0 && <p className="hint">{t("Nessun veicolo in officina: la chat si apre con ogni pratica. Per altro chiama l'officina.")}</p>}
+    {conversations && conversations.length === 0 && <p className="hint">{t("Nessun veicolo in officina in questo momento.")}</p>}
     {conversations && conversations.length > 0 && <div className="portal-chat">
       <ul className="portal-chat-list">
         {conversations.map((item) => (
@@ -578,7 +578,6 @@ export function PortalAddVehicle({ onAdded }: { onAdded: (id: string) => void })
       <button type="button" className={excel ? "primary" : "secondary"} aria-pressed={excel} onClick={() => setExcel(true)}>{language === "es" ? "Importar desde Excel" : "Importa da Excel"}</button>
     </div>
     {excel ? <PortalFleetImport onImported={() => onAdded("")} /> : <>
-    <p className="hint">{t("Puoi aggiungere veicoli alla tua flotta. Per modificarli o eliminarli contatta l'officina.")}</p>
     {saved && <p className="portal-success" role="status">✓ {t("Veicolo salvato")}: <strong>{saved}</strong></p>}
     {error && <p className="record-error" role="alert">{t(error)}</p>}
     <form className="record-form portal-add-form" onSubmit={review}>
@@ -707,7 +706,6 @@ export function PortalProfile({ onSaved }: { onSaved: () => void }) {
       <div className="portal-profile-tax">
         <h3>{t("Dati fiscali")}</h3>
         <dl>{taxData.map(([label, value]) => <div key={label}><dt>{t(label)}</dt><dd>{value || "—"}</dd></div>)}</dl>
-        <p className="hint">{t("Per modificare i dati fiscali contatta l'officina.")}</p>
       </div>
 
       <form className="record-form portal-add-form" onSubmit={save}>

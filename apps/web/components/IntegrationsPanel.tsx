@@ -82,13 +82,12 @@ export function IntegrationsPanel() {
 
   return (
     <section className="panel integrations">
-      <div className="panel-head"><div><h2>🔌 {t("Integrazioni e API")}</h2><p>{t("GPS e telemetria dei veicoli (es. OneSystec): km, spie accese, codici guasto, stile di guida.")}</p></div></div>
+      <div className="panel-head"><div><h2>🔌 {t("Integrazioni e API")}</h2></div></div>
       {message && <p className="hint" role="status">{t(message)}</p>}
 
       <div className="integrations-grid">
         <div className="integration-card">
           <h3>🔑 {t("Crea API key")}</h3>
-          <p className="hint">{t("Genera una chiave da dare al sistema esterno: con questa invia i dati dei veicoli a NAKAMA in tempo reale.")}</p>
           <form className="integration-form stacked" onSubmit={createKey}>
             <select
               value={keyUse}
@@ -125,19 +124,16 @@ export function IntegrationsPanel() {
           <details>
             <summary>{t("Istruzioni per l'assistente IA (MY SECRETARY)")}</summary>
             <p className="hint">{t("Base")} <code>{`${API_URL || ""}/assistant`}</code> · {t("intestazione")} <code>X-API-Key: nk_live_…</code> · {t("sola lettura")}</p>
-            <p className="hint">{t("L'assistente legge l'elenco degli strumenti da")} <code>GET /assistant/tools</code> {t("e può consultare: riepilogo del giorno, ricerca per targa o cliente, pratiche, preventivi, fatture, contratti, veicoli e manutenzioni, telemetria, chat clienti e personale.")}</p>
           </details>
           <details open={showExample} onToggle={(e) => setShowExample((e.target as HTMLDetailsElement).open)}>
             <summary>{t("Istruzioni per il fornitore GPS")}</summary>
             <p className="hint">POST <code>{endpoint}</code> · {t("intestazione")} <code>X-API-Key: nk_live_…</code> · {t("fino a 500 letture per invio")}</p>
             <pre className="code-example">{example}</pre>
-            <p className="hint">{t("Il veicolo si riconosce da targa o telaio (VIN). I km aggiornano da soli il piano di manutenzione.")}</p>
           </details>
         </div>
 
         <div className="integration-card">
           <h3>🧩 {t("Incorpora API key")}</h3>
-          <p className="hint">{t("Salva la chiave che ti fornisce un servizio esterno (es. OneSystec) per collegarlo quando saranno disponibili le sue API. Viene conservata cifrata.")}</p>
           <form className="integration-form stacked" onSubmit={addCredential}>
             <select value={credential.provider} onChange={(e) => setCredential({ ...credential, provider: e.target.value })} aria-label={t("Servizio")}>
               <option value="ONESYSTEC">OneSystec</option>

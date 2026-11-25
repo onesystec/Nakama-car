@@ -29,7 +29,7 @@ export default function AuditPage(){
    <button type="button" role="tab" aria-selected={tab==="changes"} className={tab==="changes"?"primary":"secondary"} onClick={()=>setTab("changes")}>{t("Modifiche")}</button>
   </div>
   {tab==="access"?<div className="panel list-panel">
-   <div className="panel-head"><div><h2>{t("Registro accessi")}</h2><p>{t("Chi è entrato nell'app, quando e come. Conservato 12 mesi per eventuali controlli.")}</p></div>
+   <div className="panel-head"><div><h2>{t("Registro accessi")}</h2></div>
     <input className="audit-search" type="search" value={email} onChange={e=>setEmail(e.target.value)} placeholder={t("Cerca per email")} aria-label={t("Cerca per email")} /></div>
    <div className="data-table access head"><span>{t("Data")}</span><span>{t("Account")}</span><span>{t("Evento")}</span><span>{t("App")}</span><span>{t("Indirizzo IP")}</span></div>
    {accesses.length===0?<div className="empty-state">{t("Nessun accesso registrato.")}</div>:accesses.map(x=><div className={`data-table access${x.event==="LOGIN_FAILED"?" access-failed":""}`} key={x.id} title={x.user_agent||undefined}>

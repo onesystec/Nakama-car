@@ -881,7 +881,6 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
       </div>
       {editSpot && (
         <div className="plate-editor" role="group" aria-label={t("Allinea la targa")}>
-          <p className="hint">{t("Trascina la targa nel suo alloggio. Vale per tutti i veicoli di questo modello.")}</p>
           <div>
             <button type="button" onClick={() => nudge({ width: editSpot.width - 0.01 })} aria-label={t("Più piccola")}>－</button>
             <button type="button" onClick={() => nudge({ width: editSpot.width + 0.01 })} aria-label={t("Più grande")}>＋</button>
@@ -927,9 +926,6 @@ export function DamagePhotoMap({ vehicle, plate, markers, onAdd, onRemove, loadR
         ))}
       </div>
       {ready && !disabled && loaded < ring.length && <p className="hint">{t("Caricamento vista 360°")} {loaded}/{ring.length}</p>}
-      {onAdd && drawMode && !pending && <p className="hint">{t("Modalità disegno: traccia il danno sul veicolo. Disattiva ✏️ Disegna per ruotarlo.")}</p>}
-      {onAdd && penSeen && !drawMode && !pending && <p className="hint">{t("Con la penna tracci il danno, con il dito ruoti il veicolo.")}</p>}
-      {pending && draft.length > 0 && <p className="hint">{t("Puoi aggiungere altri tratti allo stesso danno, poi scegli l'intervento.")}</p>}
       {pending && (
         <div className="damage-chooser" role="group" aria-label={t("Tipo di intervento")}>
           <span>{areaLabel(view, pending.x, pending.y)}</span>

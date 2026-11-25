@@ -155,7 +155,7 @@ export default function TrackingPage() {
         {(markers.length > 0 || photos.length > 0 || (data.parts?.length ?? 0) > 0 || (data.vehicle.make && data.vehicle.model)) && (
           <section className="tracking-section">
             <h2>{t("Danni e interventi sul veicolo")}</h2>
-            <p className="hint">{markers.length || data.parts?.length ? t("Gira l'auto trascinandola: i numeri indicano i danni, le lettere arancioni dove si trovano i ricambi e gli interventi.") : t("Nessun danno segnato sul veicolo.")}</p>
+            <p className="hint">{markers.length || data.parts?.length ? null : t("Nessun danno segnato sul veicolo.")}</p>
             <DamagePhotoMap
               vehicle={{ make: data.vehicle.make || "", model: data.vehicle.model || "", year: data.vehicle.year, color: data.vehicle.color || "" }}
               plate={data.vehicle.license_plate}

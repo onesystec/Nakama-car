@@ -103,7 +103,6 @@ export function CaseTracking({ caseId, plate }: { caseId: string; plate?: string
         </div>
       ) : (
         <div className="tracking-share empty">
-          <p className="hint">{t("Genera un link: il cliente vede l'avanzamento della riparazione e può scriverti in chat, senza registrarsi.")}</p>
           <button type="button" className="primary" onClick={create}>{t("Genera link per il cliente")}</button>
         </div>
       )}

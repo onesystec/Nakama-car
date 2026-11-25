@@ -172,7 +172,6 @@ export function VehicleProfile({ vehicleId, onClose, onChanged }: { vehicleId: s
                       {(maintenance!.service_interval_km || maintenance!.service_interval_months) && <div><dt>{t("Intervallo")}</dt><dd>{[km(maintenance!.service_interval_km), maintenance!.service_interval_months && `${maintenance!.service_interval_months} ${t("mesi")}`].filter(Boolean).join(" / ")}</dd></div>}
                       {(maintenance!.last_service_date || maintenance!.last_service_km) && <div><dt>{t("Ultimo tagliando")}</dt><dd>{[day(maintenance!.last_service_date), km(maintenance!.last_service_km)].filter(Boolean).join(" · ")}</dd></div>}
                     </dl>
-                    {maintenance!.state === "UNKNOWN" && <p className="hint">{t("Imposta l'intervallo e l'ultimo tagliando per avere gli avvisi di manutenzione.")}</p>}
                     {canWrite && <button type="button" className="secondary" onClick={editPlan}>{t("Modifica piano")}</button>}
                   </>
                 ) : (

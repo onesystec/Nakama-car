@@ -118,7 +118,6 @@ export function QuickPicker({ items, onPick, onCreate, onDelete }: {
                 <button type="button" className="ghost" onClick={() => setAdding(false)}>{t("Annulla")}</button>
                 <button type="button" className="primary" disabled={saving} onClick={create}>{saving ? t("Salvataggio…") : t("Salva e aggiungi")}</button>
               </div>
-              <p className="hint">{t("Resterà nella lista per tutta l'officina.")}</p>
             </div>
           )}
         </div>

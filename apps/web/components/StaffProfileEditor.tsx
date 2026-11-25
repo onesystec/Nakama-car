@@ -173,8 +173,7 @@ export function StaffDocuments({ base, admin }: { base: string; admin: boolean }
   return (
     <section className="record-form profile-form staff-documents">
       <h2 className="span-2">{t("Documenti personali")}</h2>
-      <p className="hint span-2">🔒 {admin ? t("Visibili solo al lavoratore e all’amministrazione.") : t("Visibili solo a te e all’amministrazione.")}</p>
-      {items.length === 0 && <p className="hint span-2">{t("Nessun documento. Carica carta d’identità, patente, contratto o attestati (PDF, foto o Word).")}</p>}
+      {items.length === 0 && <p className="hint span-2">{t("Nessun documento.")}</p>}
       {items.length > 0 && <ul className="staff-document-list span-2">{items.map(item => {
         const expired = item.expires_on && item.expires_on < today;
         const expiring = !expired && item.expires_on && item.expires_on <= soon;

@@ -80,7 +80,7 @@ export default function LoginPage() {
     <main className="auth-screen">
       <div className="auth-card">
         <div className="public-brand nakama-auth-brand"><NakamaLogo /></div>
-        <div className="auth-copy"><p className="eyebrow">{t("ACCESSO OPERATORE")}</p><h1>{t("Accedi alla carrozzeria")}</h1><p>{t("Gestisci pratiche, preventivi, lavorazioni e fatturazione.")}</p></div>
+        <div className="auth-copy"><p className="eyebrow">{t("ACCESSO OPERATORE")}</p><h1>{t("Accedi alla carrozzeria")}</h1></div>
         {temporary ? <PasswordStep temporary={temporary.password} onSave={savePassword} onCancel={() => { setTemporary(null); setPassword(""); }} /> :
         pending ? <LegalStep onAccept={async () => { const ok = await acceptLegal(API_URL, pending); if (ok) { setPending(null); proceed(pending); } return ok; }} onCancel={() => { setPending(null); setPassword(""); }} /> :
         <form onSubmit={submit} className="auth-form">

@@ -7,7 +7,7 @@ import { useLanguage } from "../../components/LanguageProvider";
 import { getAccessToken, hasPermission } from "../../lib/api";
 
 export default function ContrattiPage() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [signedIn, setSignedIn] = useState(false);
   const [canWrite, setCanWrite] = useState(false);
   const [creating, setCreating] = useState(0);
@@ -25,10 +25,6 @@ export default function ContrattiPage() {
         <div className="empty-state">{t("Accedi per gestire i contratti.")} <a href="/login">{t("Accedi")}</a></div>
       ) : (
         <>
-          <p className="section-intro">
-            {t("Le aziende con contratto (es. Univex, Gamonal) pagano un canone mensile: nei loro preventivi la manodopera è inclusa e i ricambi sono a costo più ricarico. I clienti al pubblico usano il listino normale.")}
-            {" "}{language === "es" ? "El contrato también aparece en el perfil de cada cliente (Clientes)." : "Il contratto si vede e si gestisce anche nel profilo di ogni cliente (Clienti)."}
-          </p>
           <FleetContracts creating={creating} />
         </>
       )}
