@@ -173,7 +173,7 @@ export default function CostiPage() {
                     <span><i className="seg-parts" />{t("Ricambi")}</span><span><i className="seg-labor_value" />{t("Manodopera")}</span><span><i className="seg-materials" />{t("Materiali")}</span><span><i className="seg-external" />{t("Servizi esterni")}</span><span><i className="seg-other" />{t("Altro")}</span><span><i className="seg-expenses" />{t("Spese reparto")}</span>
                   </div>
                   <div className="panel costs-grand">
-                    <div><span>{t("Spese generali Nakama Car")}</span><small>{t("Non legate a un reparto (affitto, utenze, assicurazioni…)")}</small></div>
+                    <div><span>{t("Spese generali Nakama Car")}</span></div>
                     <strong>{area ? "—" : formatMoney(general)}</strong>
                     <div><span>{area ? `${t("Totale")} ${t(areaLabel[area])}` : t("Totale costi del periodo")}</span></div>
                     <strong className="costs-grand-total">{formatMoney(grandTotal)}</strong>
@@ -183,7 +183,7 @@ export default function CostiPage() {
 
               {tab === "parts" && (
                 <div className="panel list-panel">
-                  <div className="panel-head"><div><h2>{t("Ricambi ordinati")}</h2><p>{t("Tutti i ricambi dei preventivi approvati nel periodo, con il costo d'acquisto.")}</p></div><strong>{formatMoney(parts.reduce((s, r) => s + n(r.total_cost), 0))}</strong></div>
+                  <div className="panel-head"><div><h2>{t("Ricambi ordinati")}</h2></div><strong>{formatMoney(parts.reduce((s, r) => s + n(r.total_cost), 0))}</strong></div>
                   <div className="data-table costs-parts head"><span>{t("Data")}</span><span>{t("Ricambio")}</span><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Q.tà")}</span><span>{t("Costo unit.")}</span><span>{t("Costo")}</span></div>
                   {parts.length === 0 ? <div className="empty-state">{t("Nessun ricambio nel periodo.")}</div> : parts.map((row) => (
                     <div className="data-table costs-parts" key={row.id}>
@@ -201,7 +201,7 @@ export default function CostiPage() {
 
               {tab === "hours" && (
                 <div className="panel list-panel">
-                  <div className="panel-head"><div><h2>{t("Ore lavorate")}</h2><p>{t("Ore di manodopera e verniciatura per pratica (dai preventivi approvati).")}</p></div><strong>{hours(hourRows.reduce((s, r) => s + n(r.labor_hours) + n(r.paint_hours), 0))}</strong></div>
+                  <div className="panel-head"><div><h2>{t("Ore lavorate")}</h2></div><strong>{hours(hourRows.reduce((s, r) => s + n(r.labor_hours) + n(r.paint_hours), 0))}</strong></div>
                   <div className="data-table costs-hours head"><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Stato")}</span><span>{t("Manodopera")}</span><span>{t("Vernice")}</span><span>{t("Totale ore")}</span><span>{t("Valore")}</span></div>
                   {hourRows.length === 0 ? <div className="empty-state">{t("Nessuna ora nel periodo.")}</div> : hourRows.map((row) => (
                     <div className="data-table costs-hours" key={row.case_id}>
@@ -219,7 +219,7 @@ export default function CostiPage() {
 
               {tab === "other" && (
                 <div className="panel list-panel">
-                  <div className="panel-head"><div><h2>{t("Altri costi")}</h2><p>{t("Materiali, servizi esterni, smaltimento e altre voci delle pratiche.")}</p></div><strong>{formatMoney(others.reduce((s, r) => s + n(r.amount), 0))}</strong></div>
+                  <div className="panel-head"><div><h2>{t("Altri costi")}</h2></div><strong>{formatMoney(others.reduce((s, r) => s + n(r.amount), 0))}</strong></div>
                   <div className="data-table costs-other head"><span>{t("Data")}</span><span>{t("Voce")}</span><span>{t("Tipo")}</span><span>{t("Pratica / targa")}</span><span>{t("Reparto")}</span><span>{t("Importo")}</span></div>
                   {others.length === 0 ? <div className="empty-state">{t("Nessun altro costo nel periodo.")}</div> : others.map((row) => (
                     <div className="data-table costs-other" key={row.id}>
@@ -238,7 +238,7 @@ export default function CostiPage() {
                 <>
                   {adding && <ExpenseForm onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void load(); }} />}
                   <div className="panel list-panel">
-                    <div className="panel-head"><div><h2>{t("Spese Nakama Car")}</h2><p>{t("Le spese dell'officina: per reparto o generali.")}</p></div>{canEdit && !adding && <button type="button" className="primary" onClick={() => setAdding(true)}>+ {t("Nuova spesa")}</button>}</div>
+                    <div className="panel-head"><div><h2>{t("Spese Nakama Car")}</h2></div>{canEdit && !adding && <button type="button" className="primary" onClick={() => setAdding(true)}>+ {t("Nuova spesa")}</button>}</div>
                     <div className="data-table costs-expenses head"><span>{t("Data")}</span><span>{t("Descrizione")}</span><span>{t("Categoria")}</span><span>{t("Reparto")}</span><span>{t("Importo")}</span></div>
                     {expenses.length === 0 ? <div className="empty-state">{t("Nessuna spesa nel periodo.")}</div> : expenses.map((row) => (
                       <div className="data-table costs-expenses" key={row.id}>

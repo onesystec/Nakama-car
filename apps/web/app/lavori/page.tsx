@@ -146,14 +146,13 @@ export default function LavoriPage() {
                   <div className="task-panel-head">
                     <div>
                       <strong>{t("Checklist lavorazione")}</strong>
-                      <small>{t("Le attività seguono l'ordine operativo dell'officina.")}</small>
                     </div>
                     <span>{(tasks[order.id] || []).filter((x) => x.status === "DONE").length}/{(tasks[order.id] || []).length} {t("completate")}</span>
                   </div>
 
                   <div className="task-list">
                     {(tasks[order.id] || []).length === 0 ? (
-                      <div className="task-empty">{t("Nessuna attività. Gli ordini creati da preventivo approvato ricevono automaticamente la checklist standard.")}</div>
+                      <div className="task-empty">{t("Nessuna attività.")}</div>
                     ) : (tasks[order.id] || []).map((task) => (
                       <div className="task-row" key={task.id}>
                         <span className={`task-check ${task.status === "DONE" ? "done" : ""}`}>{task.status === "DONE" ? "✓" : ""}</span>

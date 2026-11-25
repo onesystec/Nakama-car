@@ -266,7 +266,6 @@ export function FleetContracts({ customer, creating, onCreatingDone, onLoaded }:
                       </button>
                     ))}
                   </div>
-                  <small className="hint">{t("Il cliente deve esistere in anagrafica. Crealo prima da Clienti se necessario.")}</small>
                 </>
               )}
             </div>
@@ -286,10 +285,7 @@ export function FleetContracts({ customer, creating, onCreatingDone, onLoaded }:
       {customer ? (
         <div className="customer-contracts" aria-busy={busy}>
           {busy ? <p>{t("Caricamento…")}</p> : items.length === 0 ? (
-            <p className="hint">{words(
-              "Nessun contratto flotta: questo cliente paga il listino normale. Se è un'azienda con canone mensile, crea il contratto.",
-              "Sin contrato de flota: este cliente paga la tarifa normal. Si es una empresa con cuota mensual, crea el contrato.",
-            )}</p>
+            <p className="hint">{words("Nessun contratto flotta.", "Sin contrato de flota.")}</p>
           ) : items.map((contract) => (
             <div className="customer-contract" key={contract.id}>
               <div>
@@ -324,7 +320,7 @@ export function FleetContracts({ customer, creating, onCreatingDone, onLoaded }:
           {busy ? (
             <div className="empty-state">{t("Caricamento…")}</div>
           ) : items.length === 0 ? (
-            <div className="empty-state">{t("Nessun contratto. Crea il contratto di Univex o Gamonal per applicare le loro condizioni.")}</div>
+            <div className="empty-state">{t("Nessun contratto.")}</div>
           ) : items.map((contract) => (
             <div className="data-table contracts" key={contract.id}>
               <span><strong>{contract.customer_name}</strong><small>{contract.name}</small></span>

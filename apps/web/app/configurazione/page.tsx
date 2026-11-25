@@ -47,10 +47,10 @@ export default function ConfigurazionePage(){
    <CompanySettingsForm />
    <IntegrationsPanel />
    <div className="settings-grid">
-    <div className="panel settings-card"><div className="panel-head"><div><h2>{t("Tariffe orarie")}</h2><p>{t("Valori configurabili, mai hardcoded nel preventivo.")}</p></div></div>
+    <div className="panel settings-card"><div className="panel-head"><div><h2>{t("Tariffe orarie")}</h2></div></div>
      <div className="settings-body">{rateTypes.map(type=><div className="setting-row" key={type}><strong>{t(type)}</strong><label><input type="number" step="0.1" value={rates[type]||""} onChange={e=>setRates({...rates,[type]:e.target.value})}/><span>€/h</span></label><button onClick={()=>saveRate(type)}>{t("Salva")}</button></div>)}</div>
     </div>
-    <div className="panel settings-card"><div className="panel-head"><div><h2>{t("Nuovo utente")}</h2><p>{t("Assegna un ruolo operativo.")}</p></div></div>
+    <div className="panel settings-card"><div className="panel-head"><div><h2>{t("Nuovo utente")}</h2></div></div>
      <form className="settings-body user-form" onSubmit={createUser}>
       <input placeholder={t("Nome")} required value={userForm.first_name} onChange={e=>setUserForm({...userForm,first_name:e.target.value})}/>
       <input placeholder={t("Cognome")} required value={userForm.last_name} onChange={e=>setUserForm({...userForm,last_name:e.target.value})}/>
@@ -61,7 +61,7 @@ export default function ConfigurazionePage(){
      </form>
     </div>
    </div>
-   <div className="panel list-panel settings-users"><div className="panel-head"><div><h2>{t("Utenti")}</h2><p>{t("Accessi al tenant.")}</p></div></div>
+   <div className="panel list-panel settings-users"><div className="panel-head"><div><h2>{t("Utenti")}</h2></div></div>
     {loadError && <div role="alert" className="empty-state">{t(loadError)} <button onClick={load}>{t("Riprova")}</button></div>}
     {userMessage && <p role="status" className="staff-success">{t(userMessage)}</p>}
     <div className="data-table users editable-users head"><span>{t("Nome")}</span><span>{t("Email")}</span><span>{t("Ruolo")}</span><span>{t("Stato")}</span><span>{t("Azioni")}</span></div>

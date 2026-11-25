@@ -65,7 +65,7 @@ export function CompanySettingsForm() {
 
   return (
     <div className="panel settings-card company-card">
-      <div className="panel-head"><div><h2>{t("Dati fiscali dell'officina")}</h2><p>{t("Usati su preventivi, fatture PDF e XML FatturaPA.")}</p></div></div>
+      <div className="panel-head"><div><h2>{t("Dati fiscali dell'officina")}</h2></div></div>
       <form className="record-form settings-body" onSubmit={save}>
         {fields.map((field) => (
           <label key={field.key} className={field.span ? "span-2" : undefined}>{t(field.label)}

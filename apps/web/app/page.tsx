@@ -632,7 +632,7 @@ export default function HomePage() {
 
         <div className="dashboard-lower-grid">
           <div className="panel status-panel">
-            <div className="panel-head"><div><h2>{t("Stato pratiche")}</h2><p>{t("Distribuzione operativa")}</p></div></div>
+            <div className="panel-head"><div><h2>{t("Stato pratiche")}</h2></div></div>
             <div className="status-overview">
               <div className="donut" style={{background:dashboard&&dashboard.open_cases>0?`conic-gradient(#008455 0 ${dashboard.waiting_approval/dashboard.open_cases*100}%,#17649d 0 ${(dashboard.waiting_approval+dashboard.in_progress)/dashboard.open_cases*100}%,#d94152 0 ${(dashboard.waiting_approval+dashboard.in_progress+dashboard.waiting_parts)/dashboard.open_cases*100}%,#d6a62b 0 ${(dashboard.waiting_approval+dashboard.in_progress+dashboard.waiting_parts+dashboard.ready)/dashboard.open_cases*100}%,#94a3b8 0 100%)`:"#94a3b8"}}><div><strong>{dashboard?.open_cases ?? "—"}</strong><span>{t("Totali")}</span></div></div>
               <div className="status-legend">
@@ -646,7 +646,7 @@ export default function HomePage() {
           </div>
 
           <div className="panel">
-            <div className="panel-head"><div><h2>{t("Ultime pratiche")}</h2><p>{t("Attività recenti")}</p></div><a className="ghost link-button" href="/pratiche">{t("Vedi tutte →")}</a></div>
+            <div className="panel-head"><div><h2>{t("Ultime pratiche")}</h2></div><a className="ghost link-button" href="/pratiche">{t("Vedi tutte →")}</a></div>
             <div className="practice-table compact">
               {dashboard?.recent_practices.length===0&&<p className="empty-state">{words("Nessuna pratica ancora.","Todavía no hay expedientes.")}</p>}
               {(dashboard?.recent_practices || []).slice(0,4).map((p) => (
@@ -666,7 +666,7 @@ export default function HomePage() {
         </div>
 
         <div className="panel workshop-panel">
-          <div className="panel-head"><div><h2>{t("Stato officina")}</h2><p>{t("Lavorazioni attive")}</p></div><a className="ghost link-button" href="/lavori">{t("Apri officina →")}</a></div>
+          <div className="panel-head"><div><h2>{t("Stato officina")}</h2></div><a className="ghost link-button" href="/lavori">{t("Apri officina →")}</a></div>
           <div className="kanban">
             {ordersError?<p className="kanban-empty">{words("Impossibile caricare gli ordini di lavoro.","No se pudieron cargar las órdenes de trabajo.")}</p>:!authenticated?<p className="kanban-empty">{words("Accedi per visualizzare i lavori.","Inicia sesión para ver los trabajos.")}</p>:workOrders.length===0?<p className="kanban-empty">{t("Nessun ordine di lavoro attivo.")}</p>:workOrders.slice(0,4).map(order=><a className="kanban-card kanban-link" href="/lavori" key={order.id}><small>{t(order.status)}</small><strong>{order.work_order_number}</strong><span>{t("Priorità")} {t(order.priority)}</span></a>)}
           </div>
@@ -711,7 +711,6 @@ export default function HomePage() {
                   <input className="plate-input" placeholder="AB123CD" value={plate} onChange={(e) => { setPlate(e.target.value.toUpperCase()); setExistingVehicleId(null); setExistingCustomerId(null); setPlateLookupMessage(""); }} autoFocus />
                   {authenticated && <button className="secondary plate-search" type="button" onClick={() => lookupPlate()}>{t("Cerca nella tua anagrafica")}</button>}
                   {plateLookupMessage && <div className={`plate-lookup-message ${existingVehicleId ? "found" : ""}`}>{t(plateLookupMessage)}</div>}
-                  <p>{t("La ricerca usa prima l'anagrafica NAKAMA CAR. DAT / GT Motive potrà essere collegato successivamente per identificazione esterna e dati tecnici licenziati.")}</p>
                 </div>
               )}
 
@@ -793,7 +792,6 @@ export default function HomePage() {
               {step === 4 && (
                 <div>
                   <div className="summary-strip"><span>{t("Elementi con intervento")}</span><strong>{selectedDamageCount}</strong></div>
-                  <p className="hint">{t("Per interventi solo meccanici puoi saltare questo passaggio.")}</p>
                   <DamagePhotoMap
                     vehicle={{ make: vehicle.make, model: vehicle.model, year: vehicle.year, color: vehicle.color }}
                     plate={plate.trim()}
@@ -915,7 +913,7 @@ export default function HomePage() {
               {step === 6 && (
                 <div>
                   <div className="estimate-head">
-                    <div><h3>{t("Righe preventivo")}</h3><p>{t("Nessun dato OEM inventato: codici, prezzi e tempi vanno inseriti manualmente finché non è collegato un provider licenziato.")}</p></div>
+                    <div><h3>{t("Righe preventivo")}</h3></div>
                     <button className="secondary" onClick={addLine}>{t("+ Riga")}</button>
                   </div>
                   {contract && <ContractBanner contract={contract} />}
@@ -945,7 +943,7 @@ export default function HomePage() {
 
               {step === 7 && (
                 <div className="confirmation">
-                  <div className="confirmation-title"><span>✓</span><div><h3>{t("Pratica pronta per essere creata")}</h3><p>{t("Controlla i dati prima del salvataggio.")}</p></div></div>
+                  <div className="confirmation-title"><span>✓</span><div><h3>{t("Pratica pronta per essere creata")}</h3></div></div>
                   <div className="confirmation-grid">
                     <div><small>{t("TARGA")}</small><strong>{plate || "—"}</strong></div>
                     <div><small>{t("CLIENTE")}</small><strong>{customer.company || `${customer.firstName} ${customer.lastName}`.trim() || "—"}</strong></div>

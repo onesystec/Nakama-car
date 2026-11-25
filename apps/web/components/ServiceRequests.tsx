@@ -103,7 +103,6 @@ export function VehicleServiceRequests({ vehicleId }: { vehicleId: string }) {
             <option value="ONE_TRACK">{t(titles.ONE_TRACK)}</option>
           </select>
         </label>
-        {kind === "ONE_TRACK" && <p className="hint">{t("ONE TRACK è il sistema GPS di ONE SYSTEC. Chiedi all’officina le opzioni di installazione per questo veicolo.")}</p>}
         <label>{t(kind === "MAINTENANCE" ? "Manutenzione richiesta" : "Note per l’officina")}
           <textarea value={note} required={kind === "MAINTENANCE"} disabled={busy} maxLength={1000}
             onChange={(event) => setNote(event.target.value)} />

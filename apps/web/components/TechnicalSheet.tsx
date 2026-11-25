@@ -230,7 +230,7 @@ export function TechnicalSheet({ plate, onClose }: { plate: string; onClose?: ()
           <p className="hint">
             {sheet.updated_at
               ? `${t("Aggiornata")} ${when(sheet.updated_at)}${sheet.updated_by ? ` · ${sheet.updated_by}` : ""}. ${t("Vale per tutti i veicoli")} ${sheet.model_label}.`
-              : t("Nessun dato ancora: compila la scheda dal libretto di uso e manutenzione o dalla fattura dei ricambi. Varrà per tutti i veicoli dello stesso modello e motore.")}
+              : t("Nessun dato.")}
           </p>
           {canWrite && (
             <div className="technical-sheet-actions">
@@ -244,7 +244,6 @@ export function TechnicalSheet({ plate, onClose }: { plate: string; onClose?: ()
       {sheet && draft && (
         <div className="technical-sheet-form">
           <div className="technical-sheet-actions">{photoButton}</div>
-          {!modelReady && <p className="hint">{t("Indica marca e modello (o leggili dal libretto) per compilare il resto della scheda.")}</p>}
           <fieldset><legend>{t("Identificazione")}</legend>
             {input("vin", "Telaio (VIN)", "riquadro E del libretto")}
             {input("engine_code", "Codice motore", "riquadro P.5 del libretto")}
@@ -257,7 +256,6 @@ export function TechnicalSheet({ plate, onClose }: { plate: string; onClose?: ()
             </fieldset>
           ))}
           <fieldset disabled={!modelReady}><legend>{t("Note")}</legend>{input("notes", "Note", "")}</fieldset>
-          <p className="hint">{t("Scrivi solo valori verificati (manuale del costruttore o ricambio montato). Lascia vuoto se non lo sai.")}</p>
           <div className="record-form-actions">
             <button type="button" className="primary" disabled={busy} onClick={() => void save()}>{busy ? t("Salvataggio…") : t("Salva")}</button>
             <button type="button" className="secondary" disabled={busy} onClick={() => { setDraft(null); setFromLibretto([]); setNotice(""); }}>{t("Annulla")}</button>
