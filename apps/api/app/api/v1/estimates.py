@@ -33,6 +33,7 @@ from app.services.company import company_lines, company_profile
 from app.services.pdf import build_estimate_pdf, customer_name as pdf_customer_name
 from app.services.pricing import PUBLIC_TERMS, PricingTerms, money, price_line
 from app.services.workshop import open_work_order
+from app.services.vehicle_names import short_vehicle_name
 
 router = APIRouter(tags=["estimates"])
 
@@ -617,7 +618,7 @@ def estimate_preview(
         },
         "vehicle": {
             "plate": vehicle.license_plate,
-            "description": " ".join(filter(None, [vehicle.make, vehicle.model, vehicle.version])) or None,
+            "description": short_vehicle_name(vehicle.make, vehicle.model, vehicle.version),
             "vin": vehicle.vin,
             "mileage": vehicle.mileage,
             "fleet_number": getattr(vehicle, "fleet_number", None),
