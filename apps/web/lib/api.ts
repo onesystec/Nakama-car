@@ -44,6 +44,64 @@ function handleExpiredSession() {
   window.location.assign(`/login?expired=1&next=${encodeURIComponent(next)}`);
 }
 
+/** When the token stops working (seconds since 1970), read from the token itself. */
+function tokenExpiry(token: string): number | null {
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const exp = JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), "="))).exp;
+    return typeof exp === "number" ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+// Renew the token when less than this is left, if the user did something in the meantime.
+const RENEW_BEFORE_SECONDS = 20 * 60;
+
+/**
+ * Keeps the session open while someone is working: a login lasts 30 minutes, and without this the app
+ * went back to the login page in the middle of an estimate. Only renewed after real activity, so a
+ * computer left alone still logs out by itself. Returns the function that stops it.
+ */
+export function startSessionKeeper(): () => void {
+  let lastActivity = Date.now();
+  let lastRenewal = 0;
+  let renewing = false;
+  const onActivity = () => { lastActivity = Date.now(); };
+  const events = ["keydown", "pointerdown", "input", "wheel", "touchstart"];
+  for (const name of events) window.addEventListener(name, onActivity, { passive: true, capture: true });
+
+  async function renew() {
+    const token = getAccessToken();
+    if (!token || renewing || lastActivity <= lastRenewal) return;
+    const exp = tokenExpiry(token);
+    if (!exp || exp - Date.now() / 1000 > RENEW_BEFORE_SECONDS) return;
+    renewing = true;
+    try {
+      const response = await apiFetch("/auth/refresh", { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        // Only if nobody logged out or changed user meanwhile.
+        if (getAccessToken() === token && data?.access_token) localStorage.setItem("nakama_access_token", data.access_token);
+        lastRenewal = Date.now();
+      }
+    } catch {
+      // Offline: try again at the next check.
+    } finally {
+      renewing = false;
+    }
+  }
+
+  const timer = window.setInterval(renew, 60 * 1000);
+  const onVisible = () => { if (document.visibilityState === "visible") renew(); };
+  document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+    for (const name of events) window.removeEventListener(name, onActivity, { capture: true });
+  };
+}
+
 export type WorkArea = "BODY" | "MECHANICAL" | null;
 export type SessionUser = {
   id?: string;

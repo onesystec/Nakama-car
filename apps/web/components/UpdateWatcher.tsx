@@ -9,11 +9,12 @@ const CHECK_EVERY = 60 * 1000;
 // (if nothing is being edited); otherwise a banner offers to refresh.
 const AUTO_AFTER_AWAY = 10 * 60 * 1000;
 
-// Something the user could lose with a reload: a wizard, an open dialog, a field being typed in.
+// Something the user could lose with a reload: a wizard, an open dialog, a field being typed in,
+// a form with changes not saved yet (marked data-unsaved).
 function busy() {
   const active = document.activeElement;
   const typing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement;
-  return typing || Boolean(document.querySelector(".wizard, .modal-backdrop, .chat-dock, .chat-bubble-panel, .damage-chooser, .plate-editor"));
+  return typing || Boolean(document.querySelector(".wizard, .modal-backdrop, .chat-dock, .chat-bubble-panel, .damage-chooser, .plate-editor, [data-unsaved]"));
 }
 
 /**

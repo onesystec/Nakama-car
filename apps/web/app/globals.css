@@ -2504,3 +2504,7 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .estimate-vehicle .plate-chip { font-size: 15px; }
 .data-table.estimates.editing { outline: 2px solid #1f4aa0; outline-offset: -2px; background: rgba(31, 74, 160, .06); }
 .editing-note { color: #1f4aa0; font-weight: 700; }
+.draft-restored { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid #f0c36d; border-left: 5px solid #e0a106; border-radius: 10px; background: #fff8e6; color: #5c4300; font-weight: 600; }
+.draft-restored button { color: #8a5a00; }
+[data-theme="dark"] .draft-restored { background: #3a2d0a; border-color: #8a6a1a; color: #ffe3a3; }
+[data-theme="dark"] .draft-restored button { color: #ffd479; }
