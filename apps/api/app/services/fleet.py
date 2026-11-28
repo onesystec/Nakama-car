@@ -205,6 +205,16 @@ def vehicle_profile(db: Session, vehicle: Vehicle) -> dict:
             .order_by(Estimate.created_at)
         ).all():
             totals[estimate.repair_case_id] = str(estimate.total)  # the latest one wins
+    invoices: dict = {}
+    if cases:
+        from app.models.billing import Invoice, InvoiceStatus
+        for invoice in db.scalars(
+            select(Invoice).where(Invoice.repair_case_id.in_(list(tasks)), Invoice.tenant_id == tenant_id,
+                                  Invoice.status != InvoiceStatus.CANCELLED).order_by(Invoice.created_at)
+        ).all():
+            invoices.setdefault(invoice.repair_case_id, []).append(
+                {"id": str(invoice.id), "invoice_number": invoice.invoice_number, "status": invoice.status.value}
+            )
     history = []
     for case in cases:
         items = tasks[case.id]
@@ -213,6 +223,7 @@ def vehicle_profile(db: Session, vehicle: Vehicle) -> dict:
             "work_type": case.work_type or "BODY", "kind": case_kind(case, [task.description for task in items]),
             "closed": tracking.is_closed(case), "opened_at": case.opened_at or case.created_at,
             "mileage": case.mileage, "customer_notes": case.customer_notes, "estimate_total": totals.get(case.id),
+            "delivered_at": case.delivered_at, "invoices": invoices.get(case.id, []),
             "tasks": [
                 {"description": task.description, "status": task.status.value, "note": task.note, "completed_at": task.completed_at}
                 for task in items

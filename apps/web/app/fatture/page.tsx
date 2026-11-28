@@ -101,6 +101,9 @@ export default function FatturePage() {
     setSignedIn(token);
     setCanDelete(hasPermission("invoice.create"));
     if (!token) setBusy(false);
+    // Opened from a delivered vehicle or a case: /fatture?id=<invoice>.
+    const opened = new URLSearchParams(window.location.search).get("id");
+    if (token && opened) setOpenId(opened);
   }, []);
 
   useEffect(() => {

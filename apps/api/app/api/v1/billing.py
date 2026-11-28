@@ -281,6 +281,7 @@ def list_invoices(
     status_filter: InvoiceStatus | None = Query(None, alias="status"),
     kind: str | None = Query(None, pattern="^(REPAIR|CONTRACT_FEE)$"),
     customer_id: UUID | None = None,
+    repair_case_id: UUID | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -299,6 +300,8 @@ def list_invoices(
         query = query.where(Invoice.invoice_kind == kind)
     if customer_id is not None:
         query = query.where(Customer.id == customer_id)
+    if repair_case_id is not None:
+        query = query.where(Invoice.repair_case_id == repair_case_id)
     if q.strip():
         term = q.strip()
         query = query.where(or_(
@@ -389,7 +392,9 @@ def update_invoice_status(
                 RepairCase.tenant_id == auth.tenant_id,
             )
         ) if invoice.repair_case_id else None
-        if repair_case is not None:
+        # «Fatturato» only once the vehicle has been handed back: a vehicle still in the workshop keeps
+        # its state (and its place in «Lavori in corso») until the office presses «Consegnato».
+        if repair_case is not None and (repair_case.status == RepairCaseStatus.DELIVERED or repair_case.delivered_at):
             repair_case.status = RepairCaseStatus.INVOICED
     elif payload.status == InvoiceStatus.PAID:
         invoice.paid_at = payload.paid_at or invoice.paid_at or today

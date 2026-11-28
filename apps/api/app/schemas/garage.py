@@ -86,6 +86,8 @@ class RepairCaseRead(RepairCaseCreate):
     mechanic_id: UUID | None = None
     mechanic_assigned_at: datetime | None = None
     mechanic_name: str | None = None
+    delivered_at: datetime | None = None
+    delivered_by_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -106,6 +108,7 @@ class RepairCaseListItem(BaseModel):
     estimate_status: str | None = None
     mechanic_id: UUID | None = None
     mechanic_name: str | None = None
+    delivered_at: datetime | None = None
 
 
 class CaseMechanicUpdate(BaseModel):
