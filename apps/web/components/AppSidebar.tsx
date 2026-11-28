@@ -127,7 +127,7 @@ export function AppSidebar() {
     // The main account (no area) sees every job of the workshop, not "my" work.
     const name = href === "/officina" && user && !user.work_area ? "⚒ Lavori in corso" : key;
     const label = t(name).replace(/^\S+\s+/, "");
-    const active = pathname === href || (href !== "/" && pathname.startsWith(href + "/")) || (href === "/officina" && pathname.startsWith("/lavori"));
+    const active = pathname === href || (href !== "/" && pathname.startsWith(href + "/")) || (href === "/officina" && (pathname.startsWith("/lavori") || pathname.startsWith("/consegnati")));
     return <a key={href} href={href} className={`nav-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined} aria-label={label} title={label}>
       <NavIcon name={icon} /><span className="nav-label">{label}</span>
       {badge > 0 && <b className="nav-badge" aria-label={`${badge}`}>{badge}</b>}

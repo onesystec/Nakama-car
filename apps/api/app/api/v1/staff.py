@@ -938,6 +938,60 @@ class TaskNote(BaseModel):
     note: str = Field(default="", max_length=1000)
 
 
+@router.get("/my-work/delivered")
+def delivered_work(
+    q: str = "",
+    limit: int = Query(100, ge=1, le=300),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_permission("work_order.read")),
+):
+    """Vehicles already handed back to the customer (newest first), with who did the job and the invoice."""
+    from sqlalchemy import or_
+    from app.api.v1.cases import user_names
+    from app.models.billing import Invoice, InvoiceStatus
+
+    area = staff.user_area(db, auth.user_id, auth.tenant_id)
+    when = func.coalesce(RepairCase.delivered_at, RepairCase.updated_at)
+    query = (
+        select(RepairCase, Vehicle, Customer)
+        .join(Vehicle, Vehicle.id == RepairCase.vehicle_id)
+        .join(Customer, Customer.id == RepairCase.customer_id)
+        .where(RepairCase.tenant_id == auth.tenant_id,
+               or_(RepairCase.delivered_at.is_not(None), RepairCase.status.in_([RepairCaseStatus.DELIVERED, RepairCaseStatus.INVOICED])))
+    )
+    if area:
+        query = query.where(RepairCase.work_type == area)
+    term = q.strip()
+    if term:
+        query = query.where(or_(
+            RepairCase.case_number.icontains(term, autoescape=True), Vehicle.license_plate.icontains(term, autoescape=True),
+            Vehicle.fleet_number.icontains(term, autoescape=True), Customer.company_name.icontains(term, autoescape=True),
+            Customer.first_name.icontains(term, autoescape=True), Customer.last_name.icontains(term, autoescape=True),
+        ))
+    rows = db.execute(query.order_by(when.desc(), RepairCase.id.desc()).limit(limit)).all()
+    case_ids = [case.id for case, _, _ in rows]
+    invoices: dict = {}
+    # Workers see that the job was invoiced; number and amount only with the invoice permission.
+    can_bill = "invoice.read" in auth.permissions
+    if case_ids:
+        for invoice in db.scalars(select(Invoice).where(
+            Invoice.tenant_id == auth.tenant_id, Invoice.repair_case_id.in_(case_ids), Invoice.status != InvoiceStatus.CANCELLED,
+        ).order_by(Invoice.created_at)).all():
+            invoices.setdefault(invoice.repair_case_id, []).append(
+                {"id": str(invoice.id), "invoice_number": invoice.invoice_number, "status": invoice.status.value,
+                 "issue_date": invoice.issue_date, "total": str(invoice.total)} if can_bill else {"status": invoice.status.value}
+            )
+    names = user_names(db, [value for case, _, _ in rows for value in (case.mechanic_id, case.delivered_by)])
+    return [{
+        "repair_case_id": str(case.id), "case_number": case.case_number, "status": case.status.value,
+        "work_type": case.work_type or "BODY", "plate": vehicle.license_plate, "vehicle_id": str(vehicle.id),
+        "vehicle": " ".join(filter(None, [vehicle.make, vehicle.model])) or None, "fleet_number": vehicle.fleet_number,
+        "customer_name": customer_display_name(customer), "mileage": case.mileage,
+        "delivered_at": case.delivered_at, "delivered_by": names.get(case.delivered_by),
+        "mechanic_name": names.get(case.mechanic_id), "invoices": invoices.get(case.id, []),
+    } for case, vehicle, customer in rows]
+
+
 def my_task(db: Session, auth: AuthContext, task_id: UUID) -> WorkOrderTask:
     """A task of this workshop that belongs to the worker's area (403 otherwise)."""
     task = db.scalar(select(WorkOrderTask).where(WorkOrderTask.id == task_id, WorkOrderTask.tenant_id == auth.tenant_id))

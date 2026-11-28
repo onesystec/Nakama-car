@@ -118,3 +118,6 @@ class RepairCase(Base, UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     # end, so it is clear who did the work. Only the office can correct it.
     mechanic_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     mechanic_assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Handed back to the customer («Consegnato»): stays after the invoice moves the case to INVOICED.
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    delivered_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)

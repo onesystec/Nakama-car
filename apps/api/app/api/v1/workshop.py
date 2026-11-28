@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
+from app.models.billing import Invoice, InvoiceStatus
 from app.models.estimating import Estimate, EstimateStatus
 from app.models.garage import Customer, RepairCase, RepairCaseStatus, Vehicle
 from app.models.workshop import WorkOrder, WorkOrderStatus, WorkOrderTask
@@ -127,6 +128,21 @@ def list_work_orders(
     return items
 
 
+def set_case_status(case: RepairCase, new_status: RepairCaseStatus, user_id, invoiced: bool = False) -> None:
+    """Move the case with its work order, keeping the delivery: date and person stay on the case,
+    and a case with its invoice already issued goes straight to «Fatturato»."""
+    if new_status == RepairCaseStatus.DELIVERED:
+        if case.delivered_at is None:
+            case.delivered_at, case.delivered_by = datetime.now(timezone.utc), user_id
+        if invoiced or case.status == RepairCaseStatus.INVOICED:
+            case.status = RepairCaseStatus.INVOICED
+            return
+    elif new_status != RepairCaseStatus.INVOICED:
+        # Back in the workshop (delivered by mistake): the vehicle is not with the customer any more.
+        case.delivered_at = case.delivered_by = None
+    case.status = new_status
+
+
 @router.patch("/{work_order_id}/status", response_model=WorkOrderRead)
 def update_work_order_status(
     work_order_id: UUID,
@@ -151,7 +167,11 @@ def update_work_order_status(
         )
     )
     if repair_case is not None:
-        repair_case.status = RepairCaseStatus(payload.status.value)
+        invoiced = db.scalar(select(Invoice.id).where(
+            Invoice.repair_case_id == repair_case.id, Invoice.tenant_id == auth.tenant_id,
+            Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.PAID]),
+        ).limit(1)) is not None
+        set_case_status(repair_case, RepairCaseStatus(payload.status.value), auth.user_id, invoiced)
     record_audit(
         db,
         tenant_id=auth.tenant_id,

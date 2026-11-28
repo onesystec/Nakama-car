@@ -11,6 +11,7 @@ type Task = { description: string; status: string; note?: string | null; complet
 type HistoryCase = {
   id: string; case_number: string; status: string; work_type: string; kind: "REPAIR" | "MAINTENANCE"; closed: boolean;
   opened_at?: string | null; mileage?: number | null; customer_notes?: string | null; estimate_total?: string | null; tasks: Task[];
+  delivered_at?: string | null; invoices?: { id: string; invoice_number: string; status: string }[];
 };
 type Maintenance = {
   state: "OK" | "SOON" | "DUE" | "UNKNOWN"; service_interval_km?: number | null; service_interval_months?: number | null;
@@ -214,6 +215,8 @@ export function VehicleProfile({ vehicleId, onClose, onChanged }: { vehicleId: s
                         <a href={`/pratiche?q=${encodeURIComponent(item.case_number)}`}>{item.case_number}</a>
                         <span className="status-chip">{t(item.status)}</span>
                         <small>{item.work_type === "MECHANICAL" ? t("Meccanica") : t("Carrozzeria")}{item.estimate_total && ` · € ${item.estimate_total}`}</small>
+                        {item.delivered_at && <span className="status-chip ok">✔ {t("Consegnato")} {day(item.delivered_at)}</span>}
+                        {item.invoices?.map((invoice) => <a key={invoice.id} href={`/fatture?id=${invoice.id}`} className={`status-chip status-${invoice.status.toLowerCase()}`}>◫ {invoice.invoice_number} · {t(invoice.status)}</a>)}
                       </div>
                       {item.customer_notes && <p>{item.customer_notes}</p>}
                       {item.tasks.length > 0 && (

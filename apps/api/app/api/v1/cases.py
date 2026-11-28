@@ -34,8 +34,11 @@ def user_names(db: Session, ids) -> dict:
 
 
 def case_read(db: Session, case: RepairCase) -> RepairCaseRead:
-    """The case with the name of the worker who opened it."""
-    return RepairCaseRead.model_validate(case).model_copy(update={"mechanic_name": user_names(db, [case.mechanic_id]).get(case.mechanic_id)})
+    """The case with the names of the worker who opened it and of who handed the vehicle back."""
+    names = user_names(db, [case.mechanic_id, case.delivered_by])
+    return RepairCaseRead.model_validate(case).model_copy(update={
+        "mechanic_name": names.get(case.mechanic_id), "delivered_by_name": names.get(case.delivered_by),
+    })
 
 
 def next_case_number(db: Session, tenant_id) -> str:
@@ -132,6 +135,7 @@ def list_repair_cases(
             estimate_status=estimate_status.get(case.id),
             mechanic_id=case.mechanic_id,
             mechanic_name=names.get(case.mechanic_id),
+            delivered_at=case.delivered_at,
         )
         for case, vehicle, customer in rows
     ]

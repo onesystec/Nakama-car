@@ -2569,3 +2569,17 @@ button.fleet-vehicle-link .plate-chip { justify-self: start; }
 .panel > .empty-state { padding: 12px 14px; margin: 0; }
 .job-vehicle-view .damage-photo-map { margin: 0; gap: 6px; }
 .job-detail > .hint, .job-detail > h3 { margin: 0; }
+
+/* «Consegnati»: vehicles handed back, one compact row each. */
+.delivered-list { display: grid; gap: 6px; }
+.delivered-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid #1e9e5a; border-radius: 10px; background: var(--panel); }
+.delivered-main, .delivered-facts, .delivered-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.delivered-main small, .delivered-facts small { color: var(--muted); }
+.delivered-links { justify-content: flex-end; }
+.delivered-links a:not(.status-chip) { font-weight: 700; font-size: 13px; }
+a.status-chip { text-decoration: none; }
+.case-delivery { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+@media (max-width: 760px) {
+  .delivered-row { grid-template-columns: 1fr; }
+  .delivered-links { justify-content: flex-start; }
+}
